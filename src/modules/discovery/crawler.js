@@ -107,6 +107,7 @@ ${stripped}`;
 // ---------------------------------------------------------------------------
 
 const SOURCES = [
+  // ── Already live ────────────────────────────────────────────────────────────
   {
     name: 'Appartager',
     searchUrls: [
@@ -183,6 +184,181 @@ const SOURCES = [
         const urls = Array.from(document.querySelectorAll('a[href]'))
           .map(a => a.href)
           .filter(href => /\/annonces\/\d/.test(href) || /annonce-\d/.test(href));
+        return [...new Set(urls)];
+      }),
+  },
+
+  // ── New sources ─────────────────────────────────────────────────────────────
+
+  {
+    // Boutique colocation agency in Luxembourg City
+    name: 'Loft68',
+    searchUrls: [
+      'https://www.loft68.lu/en/rent/',
+      'https://www.loft68.lu/fr/louer/',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /loft68\.lu\/.+\/(rent|louer|property|bien|listing|annonce)/.test(href) ||
+            /loft68\.lu\/.+\/\d+/.test(href)
+          );
+        return [...new Set(urls)];
+      }),
+  },
+  {
+    // Student/young professional residence near Fort Vauban, Luxembourg
+    name: 'VaubanFort',
+    searchUrls: [
+      'https://www.vaubanfort.lu/en/',
+      'https://www.vaubanfort.lu/fr/',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /vaubanfort\.lu\/.*(room|chambre|studio|apartment|appartement|logement|unit)/.test(href)
+          );
+        return [...new Set(urls)];
+      }),
+  },
+  {
+    // LuxMill — student residence at Belval campus (Uni of Luxembourg)
+    name: 'LuxMill',
+    searchUrls: [
+      'https://www.luxmill.lu/en/rooms/',
+      'https://www.luxmill.lu/fr/chambres/',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /luxmill\.lu\/.*(room|studio|apartment|flat|chambre|logement|unit|book)/.test(href)
+          );
+        return [...new Set(urls)];
+      }),
+  },
+  {
+    // Free rental classifieds — Luxembourg section
+    name: 'FreeRentAds',
+    searchUrls: [
+      'https://www.freerentads.com/luxembourg/',
+      'https://www.freerentads.com/luxembourg/rooms/',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /freerentads\.com\/.+\/(ad|listing|annonce|room|property).*\d/.test(href) ||
+            (/freerentads\.com\/luxembourg\//.test(href) && /\d{3,}/.test(href))
+          );
+        return [...new Set(urls)];
+      }),
+  },
+  {
+    // Student housing platform — Luxembourg listings
+    name: 'ImmoJeune',
+    searchUrls: [
+      'https://www.immojeune.com/location-etudiant/luxembourg.html',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /immojeune\.com\/location-etudiant\/luxembourg\/.+\.html/.test(href) ||
+            /immojeune\.com\/.+\/\d+/.test(href)
+          );
+        return [...new Set(urls)];
+      }),
+  },
+  {
+    // LuxFriends — Luxembourg expat community classifieds
+    name: 'LuxFriends',
+    searchUrls: [
+      'https://www.luxfriends.eu/classifieds/housing/',
+      'https://www.luxfriends.eu/classifieds/rooms/',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /luxfriends\.eu\/(classifieds|ad|listing|annonce)\/.+\d/.test(href)
+          );
+        return [...new Set(urls)];
+      }),
+  },
+  {
+    // French colocation platform — Luxembourg listings
+    name: 'RechercheColocation',
+    searchUrls: [
+      'https://www.recherche-colocation.com/colocation-luxembourg.html',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /recherche-colocation\.com\/.*(colocation|annonce|colocataire).*\d/.test(href)
+          );
+        return [...new Set(urls)];
+      }),
+  },
+  {
+    // JustArrived.lu — expat relocation portal with housing classifieds
+    name: 'JustArrived',
+    searchUrls: [
+      'https://www.justarrived.lu/en/classifieds/housing/rooms-to-rent/',
+      'https://www.justarrived.lu/en/classifieds/housing/apartments-to-rent/',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /justarrived\.lu\/.*(housing|room|apartment|flat|property)\/.+/.test(href) &&
+            /\d{3,}/.test(href)
+          );
+        return [...new Set(urls)];
+      }),
+  },
+  {
+    // MyResidHome — managed student residences, Luxembourg properties
+    name: 'MyResidHome',
+    searchUrls: [
+      'https://www.myresidhome.com/en/student-residence/luxembourg.html',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /myresidhome\.com\/(en|fr)\/(residence|logement|room|studio|apartment)/.test(href)
+          );
+        return [...new Set(urls)];
+      }),
+  },
+  {
+    // Roomie-Radar — European room-finding platform
+    name: 'RoomieRadar',
+    searchUrls: [
+      'https://www.roomie-radar.com/rooms/luxembourg/',
+      'https://www.roomie-radar.com/flatshares/luxembourg/',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /roomie-radar\.com\/(listing|room|flat|post|ad|property)\/.+/.test(href) ||
+            (/roomie-radar\.com\//.test(href) && /\d{3,}/.test(href))
+          );
         return [...new Set(urls)];
       }),
   },

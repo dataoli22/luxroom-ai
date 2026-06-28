@@ -1,12 +1,18 @@
 /**
  * LuxRoom AI — Discovery / Crawler Module
  *
- * Strategy: Playwright browser automation with LLM-guided fallback (browser-use pattern).
+ * Three-tier extraction strategy per source:
  *
- * Each source has a hardcoded extractLinks() function based on CSS selectors.
- * When that yields < MIN_LINKS_THRESHOLD results, the page HTML is passed to a
- * local Hermes/Ollama model to identify listing URLs from the page structure —
- * making the crawler resilient to site redesigns without any code changes.
+ *  Tier 1 — CSS selectors   fast, hardcoded per site, breaks on redesigns
+ *  Tier 2 — LLM extraction  strips HTML → feeds to local model → parses URLs
+ *  Tier 3 — Browser-use     agentic loop: LLM sees the page, decides actions
+ *                            (dismiss cookie banner, scroll, paginate, click
+ *                            "load more"), then extracts — handles SPAs and
+ *                            any site the first two tiers can't crack
+ *
+ * Tiers 2 and 3 kick in automatically when the previous tier finds fewer than
+ * MIN_LINKS_THRESHOLD links, so adding a new source only requires a name and
+ * search URL — the crawler degrades gracefully.
  */
 
 import 'dotenv/config';
@@ -23,83 +29,284 @@ import { getSettings } from '../../settings.js';
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
-const DELAY_MIN_MS = 1500;
-const DELAY_MAX_MS = 3500;
-const MIN_LINKS_THRESHOLD = 3;   // below this → trigger LLM fallback
-const LLM_HTML_CHARS = 12_000;   // chars fed to LLM for link discovery
+const DELAY_MIN_MS       = 1500;
+const DELAY_MAX_MS       = 3500;
+const MIN_LINKS_THRESHOLD = 3;      // tiers 2 & 3 trigger below this
+const LLM_HTML_CHARS     = 10_000;  // chars fed per LLM call
+const BROWSER_USE_MAX_STEPS = 7;    // max agentic steps before giving up
 
 // ---------------------------------------------------------------------------
-// LLM-guided link extraction (browser-use pattern)
+// Shared helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Ask a local Hermes/Ollama model to identify listing URLs from the page HTML.
- * Used as fallback when CSS selectors yield too few results.
- */
-async function llmExtractLinks(html, sourceUrl, sourceName) {
-  const settings = getSettings();
-  const baseUrl  = settings.OLLAMA_BASE_URL || 'http://localhost:11434';
-  const model    = settings.OLLAMA_MODEL    || 'hermes3';
-
-  // Strip scripts/styles, keep text and hrefs
-  const stripped = html
+/** Strip scripts/styles and collapse whitespace, preserving href values. */
+function stripHtml(html) {
+  return html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<[^>]+>/g, (tag) => {
-      // Keep <a href="..."> content
-      const href = tag.match(/href=["']([^"']+)["']/i);
-      return href ? ` ${href[1]} ` : ' ';
+    .replace(/<[^>]+>/g, tag => {
+      const m = tag.match(/href=["']([^"']+)["']/i);
+      return m ? ` ${m[1]} ` : ' ';
     })
     .replace(/\s+/g, ' ')
-    .slice(0, LLM_HTML_CHARS);
+    .trim();
+}
 
-  const prompt = `You are a web scraping assistant. Below is text extracted from a housing listings search page at ${sourceUrl} (site: ${sourceName}).
+/** Filter a list of URL strings to same-origin, capped at 60. */
+function filterSameOrigin(urls, sourceUrl) {
+  const origin = new URL(sourceUrl).origin;
+  return urls
+    .filter(u => { try { return new URL(u).origin === origin; } catch { return false; } })
+    .slice(0, 60);
+}
 
-Find all URLs that point to individual housing listing detail pages (rooms, apartments, studios to rent). A listing URL typically contains an ID, a unique slug, or is structurally different from navigation/footer links.
+// ---------------------------------------------------------------------------
+// Tier 0 — unified LLM caller (Ollama chat → generate fallback)
+// ---------------------------------------------------------------------------
 
-Return ONLY a JSON array of URL strings. No markdown. No explanation. Example: ["https://example.com/listing/123", "https://example.com/annonce/456"]
+async function callLlm(prompt) {
+  const s       = getSettings();
+  const baseUrl = s.OLLAMA_BASE_URL || 'http://localhost:11434';
+  const model   = s.OLLAMA_MODEL   || 'llama3.2:3b';
+  const opts    = { num_gpu: 0, temperature: 0.1, num_predict: 512 };
 
-If you find no listing URLs, return an empty array: []
+  // Prefer /api/chat — better JSON compliance
+  try {
+    const res = await fetch(`${baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        stream: false,
+        format: 'json',
+        options: opts,
+      }),
+      signal: AbortSignal.timeout(50_000),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      return d.message?.content ?? '';
+    }
+  } catch { /* fall through */ }
+
+  // /api/generate fallback (older Ollama versions)
+  const res = await fetch(`${baseUrl}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, prompt, stream: false, options: opts }),
+    signal: AbortSignal.timeout(50_000),
+  });
+  if (!res.ok) return '';
+  const d = await res.json();
+  return d.response ?? '';
+}
+
+// ---------------------------------------------------------------------------
+// Tier 2 — LLM text extraction
+// ---------------------------------------------------------------------------
+
+async function llmExtractLinks(html, sourceUrl, sourceName) {
+  const stripped = stripHtml(html).slice(0, LLM_HTML_CHARS);
+  const prompt =
+`You are a web scraping assistant. Below is text from a housing search page at ${sourceUrl} (${sourceName}).
+
+Find all URLs pointing to individual housing listing detail pages (rooms, apartments, studios to rent). Listing URLs typically contain a numeric ID or unique slug and differ structurally from nav/footer links.
+
+Return ONLY a JSON array of absolute URL strings. No markdown, no explanation.
+Example: ["https://example.com/listing/123","https://example.com/annonce/456"]
+If none found return: []
 
 Page text:
 ${stripped}`;
 
   try {
-    const res = await fetch(`${baseUrl}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        prompt,
-        stream: false,
-        options: { num_gpu: 0 },
-      }),
-      signal: AbortSignal.timeout(60_000),
-    });
-
-    if (!res.ok) return [];
-
-    const data = await res.json();
-    const text = data.response ?? '';
-
-    // Extract JSON array from response
-    const match = text.match(/\[[\s\S]*\]/);
+    const text  = await callLlm(prompt);
+    const match = text.match(/\[[\s\S]*?\]/);
     if (!match) return [];
-
     const urls = JSON.parse(match[0]);
     if (!Array.isArray(urls)) return [];
-
-    // Filter to same-origin URLs only (security + relevance)
-    const origin = new URL(sourceUrl).origin;
-    return urls
-      .filter(u => {
-        try { return new URL(u).origin === origin; } catch { return false; }
-      })
-      .slice(0, 50);  // cap to prevent runaway
+    return filterSameOrigin(urls, sourceUrl);
   } catch (err) {
-    console.warn(`[crawler:llm] LLM link extraction failed for ${sourceName}: ${err.message}`);
+    console.warn(`[crawler:tier2] ${sourceName}: ${err.message}`);
     return [];
   }
+}
+
+// ---------------------------------------------------------------------------
+// Tier 3 — Browser-use agentic loop
+// ---------------------------------------------------------------------------
+
+/**
+ * Common cookie / GDPR banner patterns across European sites.
+ * Tries each selector silently — no error if not found.
+ */
+async function dismissCookieBanner(page) {
+  const candidates = [
+    // text-based (most reliable)
+    'button:has-text("Accept all")',
+    'button:has-text("Accept All")',
+    'button:has-text("Accepter tout")',
+    'button:has-text("Tout accepter")',
+    'button:has-text("Accepter")',
+    'button:has-text("Accept")',
+    'button:has-text("Akzeptieren")',
+    'button:has-text("Alle akzeptieren")',
+    'button:has-text("J\'accepte")',
+    'button:has-text("OK")',
+    'button:has-text("Agree")',
+    'button:has-text("I agree")',
+    'button:has-text("Got it")',
+    'button:has-text("Continue")',
+    'button:has-text("Continuer")',
+    // attribute-based fallbacks
+    '[id*="accept"][id*="cookie"]',
+    '[class*="accept"][class*="cookie"]',
+    '[id*="cookie-accept"]',
+    '[class*="cookie-accept"]',
+    '[data-testid*="accept"]',
+    '#onetrust-accept-btn-handler',
+    '.cc-accept',
+    '.cc-btn.cc-allow',
+  ];
+  for (const sel of candidates) {
+    try {
+      const el = await page.$(sel);
+      if (el && await el.isVisible()) {
+        await el.click();
+        await page.waitForTimeout(700);
+        console.log(`[crawler:banner] Dismissed cookie banner (${sel})`);
+        return true;
+      }
+    } catch { /* silent */ }
+  }
+  return false;
+}
+
+/**
+ * Agentic browser-use loop.
+ *
+ * The LLM observes the current page (as stripped HTML) and returns a JSON
+ * action. Playwright executes it. Repeat until links are found, the LLM
+ * signals done, or we hit BROWSER_USE_MAX_STEPS.
+ *
+ * Actions the LLM can choose:
+ *   extract   — current page has links, run tier-2 extraction now
+ *   scroll    — scroll down to reveal lazy-loaded listings
+ *   click     — click a button/link (provide CSS selector or visible text)
+ *   next_page — follow pagination to gather more listing URLs
+ *   done      — no more listings available
+ */
+async function browserUseAgent(page, sourceUrl, sourceName) {
+  console.log(`[crawler:tier3] Browser-use agent starting for ${sourceName}`);
+  const collectedLinks = new Set();
+  const history = [];  // keeps the LLM context-aware of what's been tried
+
+  for (let step = 0; step < BROWSER_USE_MAX_STEPS; step++) {
+    const currentUrl = page.url();
+    const html       = await page.content();
+    const stripped   = stripHtml(html).slice(0, LLM_HTML_CHARS);
+
+    const prompt =
+`You are an autonomous browser agent finding housing listings on ${sourceName}.
+Start URL: ${sourceUrl}
+Current URL: ${currentUrl}
+Steps taken: ${history.length === 0 ? 'none yet' : history.map(h => `${h.action}(${h.target ?? ''})`).join(' → ')}
+Links collected so far: ${collectedLinks.size}
+
+Current page content (truncated):
+${stripped}
+
+Choose the single best next action to collect housing listing URLs.
+Respond with ONLY valid JSON — one of these shapes:
+{"action":"extract","reason":"<why links are visible now>"}
+{"action":"scroll","reason":"<why scrolling will reveal more>"}
+{"action":"click","target":"<exact CSS selector or visible button text>","reason":"<why>"}
+{"action":"next_page","target":"<CSS selector for next-page link/button>","reason":"<why>"}
+{"action":"done","reason":"<why no more listings>"}`;
+
+    let decision = { action: 'done', reason: 'llm call failed' };
+    try {
+      const raw   = await callLlm(prompt);
+      const match = raw.match(/\{[\s\S]*?\}/);
+      if (match) decision = JSON.parse(match[0]);
+    } catch (err) {
+      console.warn(`[crawler:tier3] LLM decision failed (step ${step}): ${err.message}`);
+      break;
+    }
+
+    console.log(`[crawler:tier3] Step ${step + 1}/${BROWSER_USE_MAX_STEPS} — ${decision.action}${decision.target ? ':' + decision.target : ''}`);
+    history.push(decision);
+
+    if (decision.action === 'done') break;
+
+    if (decision.action === 'extract') {
+      const links = await llmExtractLinks(html, sourceUrl, sourceName);
+      links.forEach(l => collectedLinks.add(l));
+      console.log(`[crawler:tier3] Extracted ${links.size ?? links.length} links (total ${collectedLinks.size})`);
+      if (collectedLinks.size >= MIN_LINKS_THRESHOLD) break;
+    }
+
+    if (decision.action === 'scroll') {
+      await page.evaluate(() => window.scrollBy(0, window.innerHeight * 2));
+      await page.waitForTimeout(1200);
+    }
+
+    if (decision.action === 'click' && decision.target) {
+      try {
+        // Try CSS selector first, then visible text match
+        let el = await page.$(decision.target).catch(() => null);
+        if (!el) el = await page.getByText(decision.target, { exact: false }).first().catch(() => null);
+        if (el && await el.isVisible()) {
+          await el.click();
+          await page.waitForTimeout(1800);
+        } else {
+          console.warn(`[crawler:tier3] click target not found: ${decision.target}`);
+        }
+      } catch (err) {
+        console.warn(`[crawler:tier3] click failed: ${err.message}`);
+      }
+    }
+
+    if (decision.action === 'next_page') {
+      // Harvest what's on screen before paginating
+      const links = await llmExtractLinks(html, sourceUrl, sourceName);
+      links.forEach(l => collectedLinks.add(l));
+
+      const nextCandidates = [
+        decision.target,
+        'a[rel="next"]', '[aria-label="Next page"]', '[aria-label="Page suivante"]',
+        'a:has-text("Next")', 'a:has-text("Suivant")', 'a:has-text("Weiter")',
+        '.pagination .next', '.pager-next', 'button:has-text(">")',
+      ].filter(Boolean);
+
+      let paginated = false;
+      for (const sel of nextCandidates) {
+        try {
+          const el = await page.$(sel);
+          if (el && await el.isVisible()) {
+            await el.click();
+            await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => {});
+            await page.waitForTimeout(1500);
+            paginated = true;
+            break;
+          }
+        } catch { /* try next candidate */ }
+      }
+      if (!paginated) {
+        console.log(`[crawler:tier3] next_page: no clickable element found, stopping`);
+        break;
+      }
+    }
+  }
+
+  // Final extraction pass on whatever page we're on
+  const finalHtml  = await page.content();
+  const finalLinks = await llmExtractLinks(finalHtml, sourceUrl, sourceName);
+  finalLinks.forEach(l => collectedLinks.add(l));
+
+  console.log(`[crawler:tier3] Agent finished — ${collectedLinks.size} total links for ${sourceName}`);
+  return [...collectedLinks];
 }
 
 // ---------------------------------------------------------------------------
@@ -424,26 +631,37 @@ export async function crawlSource(sourceConfig, browser) {
       const ok = await safeGoto(page, searchUrl);
       if (!ok) continue;
 
+      // Always try to dismiss cookie/GDPR banner first — blocks link extraction on many EU sites
+      await dismissCookieBanner(page);
       await randomDelay();
 
-      // 1. Try hardcoded CSS selector extraction
+      // ── Tier 1: CSS selectors ──────────────────────────────────────────────
       let links = [];
       try {
         links = await sourceConfig.extractLinks(page);
+        console.log(`[${sourceConfig.name}] Tier 1 (CSS): ${links.length} link(s)`);
       } catch (err) {
-        console.error(`[${sourceConfig.name}] Selector extraction error: ${err.message}`);
+        console.error(`[${sourceConfig.name}] Tier 1 error: ${err.message}`);
       }
 
-      // 2. LLM-guided fallback if selectors found too few (browser-use pattern)
+      // ── Tier 2: LLM text extraction ────────────────────────────────────────
       if (links.length < MIN_LINKS_THRESHOLD) {
-        console.log(`[${sourceConfig.name}] Only ${links.length} link(s) from selectors — trying LLM extraction…`);
-        const html    = await page.content();
+        console.log(`[${sourceConfig.name}] Tier 2 (LLM extract)…`);
+        const html     = await page.content();
         const llmLinks = await llmExtractLinks(html, searchUrl, sourceConfig.name);
-        console.log(`[${sourceConfig.name}] LLM found ${llmLinks.length} additional link(s)`);
+        console.log(`[${sourceConfig.name}] Tier 2: ${llmLinks.length} link(s)`);
         links = [...new Set([...links, ...llmLinks])];
       }
 
-      console.log(`[${sourceConfig.name}] Total: ${links.length} listing URLs from ${searchUrl}`);
+      // ── Tier 3: Browser-use agentic loop ───────────────────────────────────
+      if (links.length < MIN_LINKS_THRESHOLD) {
+        console.log(`[${sourceConfig.name}] Tier 3 (browser-use agent)…`);
+        const agentLinks = await browserUseAgent(page, searchUrl, sourceConfig.name);
+        console.log(`[${sourceConfig.name}] Tier 3: ${agentLinks.length} link(s)`);
+        links = [...new Set([...links, ...agentLinks])];
+      }
+
+      console.log(`[${sourceConfig.name}] Total: ${links.length} listing URL(s) from ${searchUrl}`);
       for (const link of links) allListingUrls.add(link);
 
       await randomDelay();

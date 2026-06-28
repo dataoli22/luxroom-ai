@@ -1,0 +1,33 @@
+# ── Secrets & personal config ─────────────────────────────────────────────────
+.env
+*.env.local
+
+# ── User data (DB, settings generated at runtime) ─────────────────────────────
+data/
+*.db
+*.sqlite
+
+# ── Build outputs ─────────────────────────────────────────────────────────────
+dist/
+release/
+electron/main.bundle.js
+electron/main.bundle.js.map
+
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+
+# ── OS & editor noise ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+*.txt
+.idea/
+.vscode/settings.json
+*.suo
+*.user
+
+# ── Internal / scratch files ──────────────────────────────────────────────────
+luxroom_ai_prd.md
+housing_analyser.jsx
+UsersolichAppDataLocal*

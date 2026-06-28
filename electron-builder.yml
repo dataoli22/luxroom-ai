@@ -1,0 +1,39 @@
+appId: com.luxroom.ai
+productName: LuxRoom AI
+copyright: Copyright © 2026 LuxRoom AI — Open Source (MIT)
+
+directories:
+  buildResources: assets
+  output: release
+
+asar: true
+
+files:
+  - dist/**/*
+  - electron/**/*
+  - src/**/*
+  - node_modules/**/*
+  - package.json
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: LuxRoom AI
+
+mac:
+  target: dmg
+  category: public.app-category.productivity
+
+linux:
+  target: AppImage
+  category: Utility
+
+publish: null

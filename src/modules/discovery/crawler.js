@@ -310,6 +310,109 @@ Respond with ONLY valid JSON — one of these shapes:
 }
 
 // ---------------------------------------------------------------------------
+// Tier 4 — Pure Playwright fallback (no LLM required)
+// ---------------------------------------------------------------------------
+
+/**
+ * URL path segments that strongly suggest a listing detail page.
+ * Language-agnostic: covers English, French, German, Luxembourgish patterns.
+ */
+const LISTING_PATH_PATTERNS = [
+  // generic ID-based
+  /\/\d{4,}/,
+  /[-_]\d{4,}/,
+  /[?&]id=\d+/,
+  // English
+  /\/(listing|property|room|flat|apartment|studio|rental|ad|offer)\//i,
+  /\/(listing|property|room|flat|apartment|studio|rental|ad|offer)[-_]\d/i,
+  /\/(listing|property|room|flat|apartment|studio|rental|ad|offer)\/[\w-]{6,}/i,
+  // French
+  /\/(annonce|location|logement|chambre|colocation|louer|bien|offre)\//i,
+  /\/(annonce|location|logement|chambre|colocation|louer|bien|offre)[-_]?\d/i,
+  // German / Luxembourgish
+  /\/(mieten|zimmer|wohnung|angebot|inserat|unterkunft|wg)\//i,
+  /\/(mieten|zimmer|wohnung|angebot|inserat|unterkunft|wg)[-_]?\d/i,
+  // slug patterns (≥2 words joined by hyphens, suggests detail page not index)
+  /\/[\w]+-[\w]+-[\w]+-[\w]+-\d/,
+];
+
+/** URL segments that indicate nav/footer/utility pages — exclude these. */
+const NOISE_PATH_PATTERNS = [
+  /\/(login|register|signup|contact|about|faq|help|terms|privacy|legal|cookie|blog|news|press)\b/i,
+  /\/(search|recherche|suche|results|resultats|ergebnisse)\b/i,
+  /\.(pdf|docx?|xlsx?|zip|png|jpg|jpeg|gif|svg|css|js)(\?|$)/i,
+  /^(mailto:|tel:|javascript:)/i,
+  /^#/,
+];
+
+function looksLikeListingUrl(href, sourceOrigin) {
+  try {
+    const u = new URL(href);
+    // Must be same origin
+    if (u.origin !== sourceOrigin) return false;
+    const path = u.pathname + u.search;
+    // Reject noise
+    if (NOISE_PATH_PATTERNS.some(re => re.test(path))) return false;
+    // Must match at least one listing pattern
+    return LISTING_PATH_PATTERNS.some(re => re.test(path));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Pure Playwright fallback — no LLM dependency.
+ *
+ * 1. Scrolls the full page to trigger lazy-loaded content
+ * 2. Collects every <a href> on the page
+ * 3. Scores each URL by how many listing-path patterns it matches
+ * 4. Returns the top candidates, deduped and capped
+ *
+ * Runs when Ollama is unavailable or all three LLM tiers failed.
+ */
+async function playwrightFallback(page, sourceUrl, sourceName) {
+  console.log(`[crawler:tier4] Playwright fallback for ${sourceName}`);
+  const origin = new URL(sourceUrl).origin;
+
+  // Scroll to the bottom in increments — triggers lazy loading and infinite scroll
+  try {
+    await page.evaluate(async () => {
+      await new Promise(resolve => {
+        let last = 0;
+        const id = setInterval(() => {
+          window.scrollBy(0, window.innerHeight);
+          if (document.body.scrollHeight === last) { clearInterval(id); resolve(); }
+          last = document.body.scrollHeight;
+        }, 600);
+        // hard timeout — don't scroll forever
+        setTimeout(() => { clearInterval(id); resolve(); }, 8000);
+      });
+    });
+  } catch { /* page may not support scrolling */ }
+
+  // Collect and score all hrefs
+  const candidates = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('a[href]'))
+      .map(a => a.href)
+      .filter(Boolean)
+  );
+
+  const origin_ = origin; // closure-safe name
+  const scored = candidates
+    .filter(href => looksLikeListingUrl(href, origin_))
+    .map(href => {
+      const score = LISTING_PATH_PATTERNS.filter(re => re.test(href)).length;
+      return { href, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map(x => x.href);
+
+  const deduped = [...new Set(scored)].slice(0, 60);
+  console.log(`[crawler:tier4] ${deduped.length} candidate URL(s) for ${sourceName}`);
+  return deduped;
+}
+
+// ---------------------------------------------------------------------------
 // Source configurations
 // ---------------------------------------------------------------------------
 
@@ -659,6 +762,14 @@ export async function crawlSource(sourceConfig, browser) {
         const agentLinks = await browserUseAgent(page, searchUrl, sourceConfig.name);
         console.log(`[${sourceConfig.name}] Tier 3: ${agentLinks.length} link(s)`);
         links = [...new Set([...links, ...agentLinks])];
+      }
+
+      // ── Tier 4: Pure Playwright fallback (no LLM) ──────────────────────────
+      if (links.length < MIN_LINKS_THRESHOLD) {
+        console.log(`[${sourceConfig.name}] Tier 4 (Playwright fallback — no LLM)…`);
+        const pwLinks = await playwrightFallback(page, searchUrl, sourceConfig.name);
+        console.log(`[${sourceConfig.name}] Tier 4: ${pwLinks.length} link(s)`);
+        links = [...new Set([...links, ...pwLinks])];
       }
 
       console.log(`[${sourceConfig.name}] Total: ${links.length} listing URL(s) from ${searchUrl}`);

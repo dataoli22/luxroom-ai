@@ -37,6 +37,30 @@ You set it up once. It runs in the background. You only look at the listings wor
 >
 > If you'd prefer to verify the app before running it, you can [build it from source](#building-from-source) and inspect every line of code. The full source is in this repository.
 
+### macOS
+
+1. Download **LuxRoom AI-1.0.0.dmg** from the [Releases](../../releases/latest) page
+2. Open the `.dmg` file and drag **LuxRoom AI** into your Applications folder
+3. Open the app from Applications or Launchpad
+4. Complete the 3-field quick setup (name, email, app password)
+5. The app installs Ollama and downloads an AI model automatically — takes 2–5 minutes on first run
+
+> **macOS Gatekeeper warning**
+>
+> When you first open the app, macOS may show: *"LuxRoom AI cannot be opened because it is from an unidentified developer"* or *"LuxRoom AI cannot be opened because Apple cannot check it for malicious software."*
+>
+> **This is expected and safe to dismiss.** Apple requires a $99/year Developer Program membership to sign and notarise apps. As a free open-source tool, LuxRoom AI is not enrolled in that programme. The warning does not mean the app is malicious.
+>
+> To open it anyway, choose one of these methods:
+>
+> **Method 1 (easiest):** Right-click (or Control-click) the app icon → **Open** → **Open** in the dialog that appears.
+>
+> **Method 2:** Go to **System Settings → Privacy & Security**, scroll down to the *Security* section, and click **Open Anyway** next to the LuxRoom AI message.
+>
+> You only need to do this once — macOS remembers your choice.
+>
+> If you'd prefer to verify the app before running it, you can [build it from source](#building-from-source) and inspect every line of code.
+
 ---
 
 ## Setup
@@ -158,9 +182,13 @@ npm run build
 # → release/LuxRoom AI Setup 1.0.0.exe
 ```
 
-**Other platforms:**
+**Build the macOS installer** (must be run on a Mac):
 ```bash
-npm run build:mac    # → release/*.dmg
+npm run build:mac    # → release/*.dmg  (x64 + arm64 universal)
+```
+
+**Build the Linux installer:**
+```bash
 npm run build:linux  # → release/*.AppImage
 ```
 
@@ -210,6 +238,9 @@ The area picker and commute guide are Luxembourg-specific, but the core pipeline
 
 **The Windows installer shows a SmartScreen warning.**
 See the [note in the installation section](#windows) above — this is expected for unsigned open-source installers. Click "More info" → "Run anyway".
+
+**macOS says the app is from an unidentified developer.**
+See the [note in the installation section](#macos) above. Right-click the app → **Open** → **Open**. You only need to do this once.
 
 ---
 

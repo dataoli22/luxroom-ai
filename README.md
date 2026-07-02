@@ -39,11 +39,17 @@ You set it up once. It runs in the background. You only look at the listings wor
 
 ### macOS
 
-1. Download **LuxRoom AI-1.0.0.dmg** from the [Releases](../../releases/latest) page
-2. Open the `.dmg` file and drag **LuxRoom AI** into your Applications folder
+**Which file to download?**
+- Apple Silicon (M1/M2/M3/M4) → **LuxRoom AI-1.0.0-arm64.dmg**
+- Intel Mac → **LuxRoom AI-1.0.0-x64.dmg**
+
+Not sure? Click  → **About This Mac** → look for "Apple M…" (arm64) or "Intel" (x64).
+
+1. Download the correct `.dmg` from the [Releases](../../releases/latest) page
+2. Open the `.dmg` and drag **LuxRoom AI** into your Applications folder
 3. Open the app from Applications or Launchpad
 4. Complete the 3-field quick setup (name, email, app password)
-5. The app installs Ollama and downloads an AI model automatically — takes 2–5 minutes on first run
+5. The app downloads and installs Ollama automatically — takes 2–5 minutes on first run, then instant on every launch after
 
 > **macOS Gatekeeper warning**
 >

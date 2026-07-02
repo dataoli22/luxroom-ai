@@ -369,22 +369,48 @@ ipcMain.handle('setup:check-ollama', async () => {
 ipcMain.handle('setup:install-ollama', async () => {
   const platform = process.platform
 
-  // macOS: try Homebrew first (silent), then fall back to opening the download page
+  // macOS: download Ollama.dmg, mount it, copy app to /Applications
   if (platform === 'darwin') {
-    pushSetupProgress('install', 'Installing Ollama via Homebrew…', 10)
+    const tmpDir  = fs.mkdtempSync(path.join(os.tmpdir(), 'luxroom-ollama-'))
+    const tmpPath = path.join(tmpDir, 'Ollama.dmg')
+    pushSetupProgress('install', 'Downloading Ollama…', 5)
+
+    await new Promise((resolve, reject) => {
+      const file = fs.createWriteStream(tmpPath)
+      const follow = (url) => {
+        https.get(url, (res) => {
+          if (res.statusCode === 301 || res.statusCode === 302) {
+            return follow(res.headers.location)
+          }
+          const total = parseInt(res.headers['content-length'] ?? '0', 10)
+          let received = 0
+          res.on('data', chunk => {
+            received += chunk.length
+            const pct = total > 0 ? Math.round(5 + (received / total) * 55) : 30
+            pushSetupProgress('install', `Downloading… ${Math.round(received / 1024 / 1024)} MB`, pct)
+            file.write(chunk)
+          })
+          res.on('end', () => { file.end(); resolve() })
+          res.on('error', reject)
+        }).on('error', reject)
+      }
+      follow('https://ollama.com/download/Ollama-darwin.dmg')
+    })
+
+    pushSetupProgress('install', 'Installing Ollama…', 65)
     try {
       const { execFile } = require('child_process')
       const { promisify } = require('util')
-      await promisify(execFile)('/bin/sh', ['-c', 'brew install ollama'], { timeout: 120000 })
-      pushSetupProgress('install', 'Ollama installed via Homebrew ✓', 100)
-      return { ok: true }
-    } catch {
-      // Homebrew not installed or failed — open download page so user can install manually
-      pushSetupProgress('install', 'Opening Ollama download page…', 50)
-      shell.openExternal('https://ollama.com/download/mac')
-      pushSetupProgress('install', 'Install Ollama from the page that just opened, then return here ✓', 100)
-      return { ok: true, manual: true }
+      // Mount DMG, copy .app to /Applications, unmount
+      const mountOut = await promisify(execFile)('hdiutil', ['attach', tmpPath, '-nobrowse', '-quiet'])
+      const mountPoint = mountOut.stdout.split('\t').pop().trim()
+      await promisify(execFile)('cp', ['-R', `${mountPoint}/Ollama.app`, '/Applications/Ollama.app'])
+      await promisify(execFile)('hdiutil', ['detach', mountPoint, '-quiet'])
+    } finally {
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
     }
+    pushSetupProgress('install', 'Ollama installed ✓', 100)
+    return { ok: true }
   }
 
   if (platform !== 'win32') {

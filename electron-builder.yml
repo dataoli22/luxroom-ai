@@ -29,8 +29,14 @@ nsis:
   shortcutName: LuxRoom AI
 
 mac:
-  target: dmg
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
   category: public.app-category.productivity
+  hardenedRuntime: true
+  gatekeeperAssess: false
 
 linux:
   target: AppImage

@@ -38,7 +38,7 @@ function detectGpus() {
     if (platform === 'darwin') {
       const out = execSync(
         'system_profiler SPDisplaysDataType 2>/dev/null | grep -E "Chipset Model|VRAM"',
-        { timeout: 6000, encoding: 'utf8' }
+        { timeout: 6000, encoding: 'utf8', shell: true }
       );
       return out.split('\n')
         .filter(l => l.includes('Chipset Model:'))

@@ -367,6 +367,35 @@ ipcMain.handle('setup:check-ollama', async () => {
 })
 
 ipcMain.handle('setup:install-ollama', async () => {
+  const platform = process.platform
+
+  // macOS: try Homebrew first (silent), then fall back to opening the download page
+  if (platform === 'darwin') {
+    pushSetupProgress('install', 'Installing Ollama via Homebrew…', 10)
+    try {
+      const { execFile } = require('child_process')
+      const { promisify } = require('util')
+      await promisify(execFile)('/bin/sh', ['-c', 'brew install ollama'], { timeout: 120000 })
+      pushSetupProgress('install', 'Ollama installed via Homebrew ✓', 100)
+      return { ok: true }
+    } catch {
+      // Homebrew not installed or failed — open download page so user can install manually
+      pushSetupProgress('install', 'Opening Ollama download page…', 50)
+      shell.openExternal('https://ollama.com/download/mac')
+      pushSetupProgress('install', 'Install Ollama from the page that just opened, then return here ✓', 100)
+      return { ok: true, manual: true }
+    }
+  }
+
+  if (platform !== 'win32') {
+    // Linux: open download page
+    pushSetupProgress('install', 'Opening Ollama download page…', 50)
+    shell.openExternal('https://ollama.com/download/linux')
+    pushSetupProgress('install', 'Follow the instructions on the page that just opened ✓', 100)
+    return { ok: true, manual: true }
+  }
+
+  // Windows: download and silently run the NSIS installer
   // Use a unique temp directory (not a predictable shared path) to prevent TOCTOU
   const tmpDir  = fs.mkdtempSync(path.join(os.tmpdir(), 'luxroom-ollama-'))
   const tmpPath = path.join(tmpDir, 'OllamaSetup.exe')
@@ -376,7 +405,6 @@ ipcMain.handle('setup:install-ollama', async () => {
     const file = fs.createWriteStream(tmpPath)
     const req = https.get('https://ollama.com/download/OllamaSetup.exe', (res) => {
       if (res.statusCode === 302 || res.statusCode === 301) {
-        // follow redirect
         https.get(res.headers.location, (res2) => {
           const total = parseInt(res2.headers['content-length'] ?? '0', 10)
           let received = 0
@@ -407,7 +435,6 @@ ipcMain.handle('setup:install-ollama', async () => {
 
   pushSetupProgress('install', 'Running installer… (takes ~30 seconds)', 65)
   try {
-    // Use execFile with explicit args — no shell string interpolation
     const { execFile } = require('child_process')
     const { promisify } = require('util')
     await promisify(execFile)(tmpPath, ['/S'])

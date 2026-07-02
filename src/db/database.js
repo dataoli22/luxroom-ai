@@ -2,14 +2,19 @@ import { createRequire } from 'module';
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import os from 'os';
 
 // Force sql.js to load as CJS to avoid Electron's ESM→CJS interop bug
 const _require = createRequire(import.meta.url);
 const initSqlJs = _require('sql.js');
 
+// Use writable user-data dir in Electron, project root in CLI mode
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = join(__dirname, '..', '..');
-const DB_DIR = join(PROJECT_ROOT, 'data');
+function getDbDir() {
+  if (process.env.ELECTRON_USER_DATA) return process.env.ELECTRON_USER_DATA;
+  return join(__dirname, '..', '..', 'data');
+}
+const DB_DIR = getDbDir();
 const DB_PATH = join(DB_DIR, 'luxroom.db');
 
 let db;

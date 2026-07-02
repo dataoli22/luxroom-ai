@@ -182,20 +182,22 @@ npm install
 npm run dev          # opens the app in development mode with hot reload
 ```
 
-**Build the Windows installer:**
+**Release builds are automatic.** Push a version tag and GitHub Actions builds all three installers and attaches them to the release:
+
 ```bash
-npm run build
-# → release/LuxRoom AI Setup 1.0.0.exe
+git tag v1.0.2
+git push origin v1.0.2
+# GitHub Actions produces:
+#   LuxRoom AI Setup 1.0.2.exe      (Windows, built on windows-latest)
+#   LuxRoom AI-1.0.2-x64.dmg       (macOS Intel, built on macos-13)
+#   LuxRoom AI-1.0.2-arm64.dmg     (macOS Apple Silicon, built on macos-14)
 ```
 
-**Build the macOS installer** (must be run on a Mac):
+**To build locally:**
 ```bash
-npm run build:mac    # → release/*.dmg  (x64 + arm64 universal)
-```
-
-**Build the Linux installer:**
-```bash
-npm run build:linux  # → release/*.AppImage
+npm run build        # Windows .exe  (run on Windows)
+npm run build:mac    # macOS .dmg    (must run on a Mac)
+npm run build:linux  # Linux .AppImage
 ```
 
 ### Project structure

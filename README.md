@@ -20,52 +20,53 @@ You set it up once. It runs in the background. You only look at the listings wor
 
 ## Download & Install
 
+👉 **[Go to the latest release →](../../releases/latest)**
+
+Pick your file:
+
+| Your computer | File to download |
+|---|---|
+| Windows (any modern PC) | `LuxRoom AI Setup x.x.x.exe` |
+| Mac — Apple Silicon (M1/M2/M3/M4) | `LuxRoom AI-x.x.x-arm64.dmg` |
+| Mac — Intel | `LuxRoom AI-x.x.x-x64.dmg` |
+
+> **Not sure which Mac you have?** Click the  menu → **About This Mac**. If it says "Apple M…" you have Apple Silicon. If it says "Intel" you have Intel.
+
+---
+
 ### Windows
 
-1. Download **LuxRoom AI Setup 1.0.0.exe** from the [Releases](../../releases/latest) page
-2. Double-click the installer and follow the prompts
-3. Complete the 3-field quick setup (name, email, app password)
-4. The app installs Ollama and downloads an AI model automatically — takes 2–5 minutes on first run, then instant on every launch after
+1. Download the `.exe` and double-click it
+2. If Windows asks *"Do you want to allow this app to make changes?"* — click **Yes**
+3. Follow the installer prompts (takes under a minute)
+4. Open **LuxRoom AI** from the Start menu or desktop shortcut
+5. Fill in the 3-field setup (name, email, app password) — done in under 2 minutes
+6. The app automatically installs Ollama and downloads an AI model in the background — takes 2–5 minutes the first time, then instant on every launch after
 
-> **Windows SmartScreen warning**
+> **"Windows protected your PC" — SmartScreen warning**
 >
-> When you run the installer, Windows will show a blue screen saying **"Windows protected your PC"** with the message *"Microsoft Defender SmartScreen prevented an unrecognized app from starting."*
+> You'll see a blue screen saying *"Microsoft Defender SmartScreen prevented an unrecognized app from starting."* This is normal for any open-source app that hasn't paid ~$300/year for a Microsoft code-signing certificate. It does **not** mean the app is malicious.
 >
-> **This is expected and safe to dismiss.** SmartScreen flags every installer from a publisher that hasn't paid ~$300/year to register with Microsoft's code-signing programme — which is not cost-effective for a free open-source tool. The warning does not mean the app is malicious.
->
-> To proceed: click **"More info"** → **"Run anyway"**.
->
-> If you'd prefer to verify the app before running it, you can [build it from source](#building-from-source) and inspect every line of code. The full source is in this repository.
+> Click **"More info"** → **"Run anyway"** to proceed. You only see this once.
+
+---
 
 ### macOS
 
-**Which file to download?**
-- Apple Silicon (M1/M2/M3/M4) → **LuxRoom AI-1.0.0-arm64.dmg**
-- Intel Mac → **LuxRoom AI-1.0.0-x64.dmg**
+1. Download the correct `.dmg` for your chip (see table above)
+2. Open the `.dmg` — a window appears with the LuxRoom AI icon
+3. Drag **LuxRoom AI** into the **Applications** folder shortcut in that window
+4. Open **Launchpad** (or go to Applications) and click LuxRoom AI
+5. Fill in the 3-field setup (name, email, app password) — done in under 2 minutes
+6. The app automatically downloads and installs Ollama in the background — takes 2–5 minutes the first time, then instant on every launch after
 
-Not sure? Click  → **About This Mac** → look for "Apple M…" (arm64) or "Intel" (x64).
-
-1. Download the correct `.dmg` from the [Releases](../../releases/latest) page
-2. Open the `.dmg` and drag **LuxRoom AI** into your Applications folder
-3. Open the app from Applications or Launchpad
-4. Complete the 3-field quick setup (name, email, app password)
-5. The app downloads and installs Ollama automatically — takes 2–5 minutes on first run, then instant on every launch after
-
-> **macOS Gatekeeper warning**
+> **"Cannot be opened because it is from an unidentified developer" — Gatekeeper warning**
 >
-> When you first open the app, macOS may show: *"LuxRoom AI cannot be opened because it is from an unidentified developer"* or *"LuxRoom AI cannot be opened because Apple cannot check it for malicious software."*
+> macOS blocks apps that aren't signed with an Apple Developer certificate ($99/year). As a free open-source app, LuxRoom AI is not enrolled in Apple's programme. It is **not** malicious — the full source code is in this repository.
 >
-> **This is expected and safe to dismiss.** Apple requires a $99/year Developer Program membership to sign and notarise apps. As a free open-source tool, LuxRoom AI is not enrolled in that programme. The warning does not mean the app is malicious.
+> **To open it:** Right-click (or Control-click) the app icon in Applications → **Open** → **Open**. That's it — you only need to do this once, macOS remembers.
 >
-> To open it anyway, choose one of these methods:
->
-> **Method 1 (easiest):** Right-click (or Control-click) the app icon → **Open** → **Open** in the dialog that appears.
->
-> **Method 2:** Go to **System Settings → Privacy & Security**, scroll down to the *Security* section, and click **Open Anyway** next to the LuxRoom AI message.
->
-> You only need to do this once — macOS remembers your choice.
->
-> If you'd prefer to verify the app before running it, you can [build it from source](#building-from-source) and inspect every line of code.
+> If right-click → Open doesn't work: go to **System Settings → Privacy & Security**, scroll to the Security section, and click **Open Anyway**.
 
 ---
 

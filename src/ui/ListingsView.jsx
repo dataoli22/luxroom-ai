@@ -384,7 +384,7 @@ function ListingCard({ listing, onDraftCreated }) {
   );
 }
 
-export default function ListingsView() {
+export default function ListingsView({ status = {} }) {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [verdictFilter, setVerdictFilter] = useState('All');
@@ -503,6 +503,18 @@ export default function ListingsView() {
         </div>
       </div>
 
+      {/* Live scan banner */}
+      {status.running && listings.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16,
+          background: '#1a0f2e', border: '1px solid #4c1d95', borderRadius: 8,
+          padding: '8px 14px', fontSize: 13, color: '#a78bfa',
+        }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#a78bfa', flexShrink: 0, animation: 'pulse 1.2s infinite' }} />
+          Scanning housing sites — new listings will appear automatically when found.
+        </div>
+      )}
+
       {/* Stats row */}
       <div
         style={{
@@ -544,17 +556,36 @@ export default function ListingsView() {
           Loading listings…
         </div>
       ) : filtered.length === 0 ? (
-        <div
-          style={{
-            color: '#475569',
-            textAlign: 'center',
-            marginTop: 80,
-            fontSize: 15,
-          }}
-        >
-          {listings.length === 0
-            ? 'No listings yet. Click Run Now to start crawling.'
-            : 'No listings match the current filters.'}
+        <div style={{ textAlign: 'center', marginTop: 80 }}>
+          {listings.length === 0 ? (
+            status.running ? (
+              <>
+                <div style={{ fontSize: 36, marginBottom: 16 }}>🔍</div>
+                <div style={{ color: '#a78bfa', fontWeight: 600, fontSize: 15, marginBottom: 8 }}>
+                  Scanning housing sites now…
+                </div>
+                <div style={{ color: '#475569', fontSize: 13 }}>
+                  First scan takes a few minutes. Listings will appear here automatically.
+                </div>
+                <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center', gap: 6 }}>
+                  {[0,1,2].map(i => (
+                    <div key={i} style={{
+                      width: 8, height: 8, borderRadius: '50%', background: '#a78bfa',
+                      opacity: 0.3, animation: `bounce 1.2s ${i * 0.2}s infinite`,
+                    }} />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 36, marginBottom: 16 }}>🏠</div>
+                <div style={{ color: '#475569', fontSize: 15, marginBottom: 8 }}>No listings yet.</div>
+                <div style={{ color: '#334155', fontSize: 13 }}>Click <span style={{ color: '#f1f5f9' }}>Run Now</span> in the header to start your first scan.</div>
+              </>
+            )
+          ) : (
+            <div style={{ color: '#475569', fontSize: 15 }}>No listings match the current filters.</div>
+          )}
         </div>
       ) : (
         <div

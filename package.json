@@ -13,6 +13,7 @@
     "electron": "electron .",
     "start": "node src/pipeline.js",
     "crawl": "node src/modules/discovery/crawler.js",
+    "smoke": "node smoke-test.mjs",
     "approve": "node src/modules/hermes/approve.js"
   },
   "dependencies": {

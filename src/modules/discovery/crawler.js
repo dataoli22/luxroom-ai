@@ -469,7 +469,7 @@ async function paginateAndExtract(page, sourceConfig, maxPages) {
 // Source configurations
 // ---------------------------------------------------------------------------
 
-const SOURCES = [
+export const SOURCES = [
   // ── Already live ────────────────────────────────────────────────────────────
   {
     name: 'Appartager',
@@ -489,16 +489,17 @@ const SOURCES = [
   },
   {
     name: 'Athome',
+    // NOTE (2026-07): the old /louer/chambre/... URL now 404s. Athome moved to
+    // /en/rent/<type>/<city>/ with id-<digits>.html detail pages. Verified live.
     searchUrls: [
-      'https://www.athome.lu/louer/chambre/luxembourg/trier-date-asc.html',
+      'https://www.athome.lu/en/rent/apartment/luxembourg/',
+      'https://www.athome.lu/en/srp/?tr=rent&prop=house-apartment&loc=L2-luxembourg',
     ],
     extractLinks: async (page) =>
       page.evaluate(() => {
-        const urls = Array.from(
-          document.querySelectorAll('a[href*="/louer/chambre/"]')
-        )
+        const urls = Array.from(document.querySelectorAll('a[href]'))
           .map(a => a.href)
-          .filter(href => /\/id-\d+/.test(href) || /\/annonce-/.test(href) || /\d{5,}/.test(href));
+          .filter(href => /athome\.lu\/(en\/rent|louer)\//.test(href) && /id-\d+/.test(href));
         return [...new Set(urls)];
       }),
   },

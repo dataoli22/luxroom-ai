@@ -26,8 +26,8 @@ Pick your file:
 
 | Your computer | File to download |
 |---|---|
-| Windows (any modern PC) | `LuxRoom AI Setup x.x.x.exe` |
-| Mac (M1/M2/M3/M4 — Apple Silicon) | `LuxRoom AI-x.x.x-arm64.dmg` |
+| 🪟 Windows (any modern PC) | `LuxRoom-AI-Windows.exe` |
+| 🍎 Mac (M1/M2/M3/M4 — Apple Silicon) | `LuxRoom-AI-Mac-AppleSilicon.dmg` |
 
 > **Intel Mac?** Not currently supported as a pre-built download. You can [build from source](#building-from-source) on any Mac.
 
@@ -59,13 +59,19 @@ Pick your file:
 5. Fill in the 3-field setup (name, email, app password) — done in under 2 minutes
 6. The app automatically downloads and installs Ollama in the background — takes 2–5 minutes the first time, then instant on every launch after
 
-> **"Cannot be opened because it is from an unidentified developer" — Gatekeeper warning**
+> **macOS security warning — "damaged" or "unidentified developer"**
 >
 > macOS blocks apps that aren't signed with an Apple Developer certificate ($99/year). As a free open-source app, LuxRoom AI is not enrolled in Apple's programme. It is **not** malicious — the full source code is in this repository.
 >
-> **To open it:** Right-click (or Control-click) the app icon in Applications → **Open** → **Open**. That's it — you only need to do this once, macOS remembers.
+> If you see **"LuxRoom AI is damaged and can't be opened"**, open Terminal and run this command:
+> ```bash
+> xattr -cr "/Applications/LuxRoom AI.app"
+> ```
+> Then try opening the app again — it will work.
 >
-> If right-click → Open doesn't work: go to **System Settings → Privacy & Security**, scroll to the Security section, and click **Open Anyway**.
+> If you see **"Cannot be opened because it is from an unidentified developer"**: right-click (or Control-click) the app icon → **Open** → **Open**. You only need to do this once.
+>
+> If neither works: go to **System Settings → Privacy & Security** → scroll to Security → click **Open Anyway**.
 
 ---
 
@@ -247,8 +253,8 @@ The area picker and commute guide are Luxembourg-specific, but the core pipeline
 **The Windows installer shows a SmartScreen warning.**
 See the [note in the installation section](#windows) above — this is expected for unsigned open-source installers. Click "More info" → "Run anyway".
 
-**macOS says the app is from an unidentified developer.**
-See the [note in the installation section](#macos) above. Right-click the app → **Open** → **Open**. You only need to do this once.
+**macOS says "damaged and can't be opened" or "unidentified developer".**
+Open Terminal and run: `xattr -cr "/Applications/LuxRoom AI.app"` then try again. See the full [macOS install note](#macos) for all options.
 
 ---
 

@@ -20,6 +20,7 @@ win:
     - target: nsis
       arch:
         - x64
+  artifactName: LuxRoom-AI-Windows.exe
 
 nsis:
   oneClick: false
@@ -32,13 +33,11 @@ mac:
   target:
     - target: dmg
       arch:
-        - x64
-    - target: dmg
-      arch:
         - arm64
   category: public.app-category.productivity
   hardenedRuntime: true
   gatekeeperAssess: false
+  artifactName: LuxRoom-AI-Mac-AppleSilicon.dmg
 
 linux:
   target: AppImage

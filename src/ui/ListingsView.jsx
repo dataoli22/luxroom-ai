@@ -146,6 +146,7 @@ function ListingCard({ listing, onDraftCreated }) {
     urgency,
     source,
     analyzedAt,
+    stale,
   } = listing;
 
   const title = listingTitle || url || 'Untitled';
@@ -186,6 +187,7 @@ function ListingCard({ listing, onDraftCreated }) {
         gap: 12,
         transition: 'border-color 0.15s',
         cursor: url ? 'pointer' : 'default',
+        opacity: stale ? 0.6 : 1,
       }}
       onClick={(e) => { if (!e.target.closest('button') && url) openListing(); }}
       onMouseEnter={e => (e.currentTarget.style.borderColor = '#334155')}
@@ -196,6 +198,15 @@ function ListingCard({ listing, onDraftCreated }) {
         {verdict && <VerdictBadge verdict={verdict} />}
         <ScoreDots score={score || 0} />
         {corridor && <CorridorBadge corridor={corridor} />}
+        {stale && (
+          <span style={{
+            marginLeft: 'auto', backgroundColor: '#42200f', color: '#fb923c',
+            border: '1px solid #7c2d12', borderRadius: 4, padding: '2px 8px',
+            fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+          }} title="Not seen in recent scans — the listing may have been taken down">
+            ⚠ MAY BE GONE
+          </span>
+        )}
       </div>
 
       {/* Title */}

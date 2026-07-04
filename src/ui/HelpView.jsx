@@ -16,7 +16,7 @@ const s = {
   h1: { fontSize: 22, fontWeight: 700, marginBottom: 4, color: c.text },
   sub: { fontSize: 13, color: c.sub, marginBottom: 32 },
   section: { marginBottom: 36 },
-  h2: { fontSize: 15, fontWeight: 700, color: c.accent, marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 12 },
+  h2: { fontSize: 12, fontWeight: 700, color: c.accent, marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.06em' },
   step: { display: 'flex', gap: 14, marginBottom: 16, alignItems: 'flex-start' },
   stepNum: {
     width: 26, height: 26, borderRadius: '50%', background: c.accent,

@@ -53,12 +53,12 @@ function stripHtml(html) {
     .trim();
 }
 
-/** Filter a list of URL strings to same-origin, capped at 60. */
+/** Filter a list of URL strings to same-origin, capped at 150. */
 function filterSameOrigin(urls, sourceUrl) {
   const origin = new URL(sourceUrl).origin;
   return urls
     .filter(u => { try { return new URL(u).origin === origin; } catch { return false; } })
-    .slice(0, 60);
+    .slice(0, 150);
 }
 
 // ---------------------------------------------------------------------------
@@ -408,9 +408,61 @@ async function playwrightFallback(page, sourceUrl, sourceName) {
     .sort((a, b) => b.score - a.score)
     .map(x => x.href);
 
-  const deduped = [...new Set(scored)].slice(0, 60);
+  const deduped = [...new Set(scored)].slice(0, 150);
   console.log(`[crawler:tier4] ${deduped.length} candidate URL(s) for ${sourceName}`);
   return deduped;
+}
+
+// ---------------------------------------------------------------------------
+// Tier 1 pagination — follow "next page" links and re-run CSS extraction
+// ---------------------------------------------------------------------------
+
+/**
+ * After Tier-1 extraction, follow up to maxPages "next page" links, re-running
+ * sourceConfig.extractLinks on each and accumulating the results. Stops early
+ * when no next-page element is found. Uses the same next-candidate selector
+ * list as the tier-3 next_page block.
+ */
+async function paginateAndExtract(page, sourceConfig, maxPages) {
+  const collected = new Set();
+
+  const nextCandidates = [
+    'a[rel="next"]', '[aria-label="Next page"]', '[aria-label="Page suivante"]',
+    'a:has-text("Next")', 'a:has-text("Suivant")', 'a:has-text("Weiter")',
+    '.pagination .next', '.pager-next', 'button:has-text(">")',
+  ];
+
+  let pagesVisited = 0;
+  for (let i = 0; i < maxPages; i++) {
+    // Find a clickable next-page element
+    let paginated = false;
+    for (const sel of nextCandidates) {
+      try {
+        const el = await page.$(sel);
+        if (el && await el.isVisible()) {
+          await el.click();
+          await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => {});
+          await page.waitForTimeout(1500);
+          paginated = true;
+          break;
+        }
+      } catch { /* try next candidate */ }
+    }
+    if (!paginated) break;
+
+    pagesVisited++;
+
+    // Re-run Tier-1 CSS extraction on the new page
+    try {
+      const links = await sourceConfig.extractLinks(page);
+      links.forEach(l => collected.add(l));
+    } catch (err) {
+      console.error(`[${sourceConfig.name}] Pagination extract error: ${err.message}`);
+    }
+  }
+
+  console.log(`[${sourceConfig.name}] Pagination: visited ${pagesVisited} extra page(s), ${collected.size} link(s)`);
+  return [...collected];
 }
 
 // ---------------------------------------------------------------------------
@@ -673,6 +725,90 @@ const SOURCES = [
         return [...new Set(urls)];
       }),
   },
+  {
+    // Wortimmo — major Luxembourg real-estate portal (Luxemburger Wort)
+    name: 'Wortimmo',
+    searchUrls: [
+      'https://www.wortimmo.lu/en/renting?transaction=2&propertyType=8',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /wortimmo\.lu\/(en|fr|de)\/.*(annonce|listing|detail|property|immo).*\d/.test(href) ||
+            (/wortimmo\.lu/.test(href) && /\d{5,}/.test(href))
+          );
+        return [...new Set(urls)];
+      }),
+  },
+  {
+    // HousingAnywhere — international student housing marketplace
+    name: 'HousingAnywhere',
+    searchUrls: [
+      'https://housinganywhere.com/s/Luxembourg--Luxembourg',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /housinganywhere\.com\/(room|apartment|studio|listing)\/.+/.test(href) ||
+            (/housinganywhere\.com/.test(href) && /\/\d{4,}/.test(href))
+          );
+        return [...new Set(urls)];
+      }),
+  },
+  {
+    // Spotahome — mid/long-term rental marketplace, Luxembourg listings
+    name: 'Spotahome',
+    searchUrls: [
+      'https://www.spotahome.com/luxembourg',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /spotahome\.com\/.*(listing|property|for-rent)\/.+/.test(href) ||
+            (/spotahome\.com/.test(href) && /\/\d{5,}/.test(href))
+          );
+        return [...new Set(urls)];
+      }),
+  },
+  {
+    // Uniplaces — student accommodation platform, Luxembourg listings
+    name: 'Uniplaces',
+    searchUrls: [
+      'https://www.uniplaces.com/accommodation/luxembourg',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /uniplaces\.com\/accommodation\/luxembourg\/\d+/.test(href)
+          );
+        return [...new Set(urls)];
+      }),
+  },
+  {
+    // Immoweb — Belgian real-estate portal covering Luxembourg province
+    name: 'Immoweb',
+    searchUrls: [
+      'https://www.immoweb.be/en/search/house-and-apartment/for-rent/luxembourg/province',
+    ],
+    extractLinks: async (page) =>
+      page.evaluate(() => {
+        const urls = Array.from(document.querySelectorAll('a[href]'))
+          .map(a => a.href)
+          .filter(href =>
+            /immoweb\.be\/en\/classified\/.+\/\d{6,}/.test(href) ||
+            /immoweb\.be\/en\/classified/.test(href)
+          );
+        return [...new Set(urls)];
+      }),
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -691,20 +827,51 @@ function md5(input) {
   return crypto.createHash('md5').update(input).digest('hex');
 }
 
+/**
+ * Bounded-concurrency map — runs `fn` over `items` with at most `limit`
+ * in flight at once. Results are returned in the original item order.
+ * Avoids pulling in an external concurrency-pool dependency.
+ */
+async function mapLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < items.length) {
+      const i = cursor++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+
 async function safeGoto(page, url) {
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     return true;
   } catch (err) {
     console.error(`[crawler] Navigation error for ${url}: ${err.message}`);
-    return false;
+    // One retry with a 3-second backoff before giving up
+    console.log(`[crawler] Retrying ${url} in 3s…`);
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      return true;
+    } catch (retryErr) {
+      console.error(`[crawler] Retry failed for ${url}: ${retryErr.message}`);
+      return false;
+    }
   }
 }
 
 async function capturePageData(page) {
-  const html       = await page.content();
-  const screenshot = await page.screenshot({ encoding: 'base64', fullPage: false });
-  return { html, screenshot };
+  // Screenshot capture dropped — the analyser never uses it and it bloats the DB.
+  // Shape is preserved (screenshot: null) so downstream rawRecord code still works.
+  const html = await page.content();
+  return { html, screenshot: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -746,6 +913,14 @@ export async function crawlSource(sourceConfig, browser) {
         console.log(`[${sourceConfig.name}] Tier 1 (CSS): ${links.length} link(s)`);
       } catch (err) {
         console.error(`[${sourceConfig.name}] Tier 1 error: ${err.message}`);
+      }
+
+      // ── Tier 1 pagination: follow "next page" links to gather more ──────────
+      // Only for working CSS sources that haven't yet hit the same-origin cap.
+      if (links.length > 0 && links.length < 150) {
+        console.log(`[${sourceConfig.name}] Tier 1 pagination (up to 5 pages)…`);
+        const pagedLinks = await paginateAndExtract(page, sourceConfig, 5);
+        links = [...new Set([...links, ...pagedLinks])];
       }
 
       // ── Tier 2: LLM text extraction ────────────────────────────────────────
@@ -827,7 +1002,9 @@ export async function crawlAll() {
   const allNewRecords  = [];
 
   try {
-    for (const sourceConfig of SOURCES) {
+    // Crawl up to 3 sources at once — each crawlSource opens its own browser
+    // context, and Chromium handles many concurrent contexts per instance.
+    await mapLimit(SOURCES, 3, async (sourceConfig) => {
       console.log(`\n[crawler] Starting source: ${sourceConfig.name}`);
       try {
         const records = await crawlSource(sourceConfig, browser);
@@ -836,7 +1013,7 @@ export async function crawlAll() {
       } catch (err) {
         console.error(`[crawler] Error in source ${sourceConfig.name}: ${err.message}`);
       }
-    }
+    });
   } finally {
     await browser.close();
   }

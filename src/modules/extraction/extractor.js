@@ -89,14 +89,21 @@ async function isModelAvailable(baseUrl, model) {
 
 async function resolveOllamaModel(baseUrl, configuredModel) {
   if (_resolvedModel) return _resolvedModel;
+  // Prefer the model the user explicitly configured in setup, if available.
+  if (configuredModel && await isModelAvailable(baseUrl, configuredModel)) {
+    console.log(`[extractor] Using configured model: ${configuredModel}`);
+    _resolvedModel = configuredModel;
+    return configuredModel;
+  }
+  // Otherwise fall back to probing the known-good Hermes structured-output models.
   for (const m of HERMES_MODELS) {
     if (await isModelAvailable(baseUrl, m)) {
-      console.log(`[extractor] Hermes model available: ${m}`);
+      console.log(`[extractor] Configured model unavailable — Hermes model available: ${m}`);
       _resolvedModel = m;
       return m;
     }
   }
-  console.log(`[extractor] Hermes not found — using ${configuredModel}`);
+  console.log(`[extractor] No Hermes fallback found — using ${configuredModel}`);
   _resolvedModel = configuredModel;
   return configuredModel;
 }

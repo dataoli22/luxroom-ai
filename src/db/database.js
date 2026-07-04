@@ -19,9 +19,22 @@ const DB_PATH = join(DB_DIR, 'luxroom.db');
 
 let db;
 
+let _batchDepth = 0;
+let _dirty = false;
+
+export function beginBatch() { _batchDepth++; }
+export function endBatch() {
+  _batchDepth = Math.max(0, _batchDepth - 1);
+  if (_batchDepth === 0 && _dirty) { saveDb(); _dirty = false; }
+}
+
 function saveDb() {
   const data = db.export();
   writeFileSync(DB_PATH, Buffer.from(data));
+}
+
+function maybeSave() {
+  if (_batchDepth > 0) { _dirty = true; } else { saveDb(); }
 }
 
 async function getDb() {
@@ -38,7 +51,7 @@ async function getDb() {
 
 function run(sql, params = {}) {
   db.run(sql, params);
-  saveDb();
+  maybeSave();
 }
 
 function get(sql, params = []) {
@@ -111,6 +124,17 @@ export async function initDb() {
       htmlHash TEXT
     );
   `);
+
+  // Migrations: sql.js has no ADD COLUMN IF NOT EXISTS, so inspect table_info.
+  const rawCols = all('PRAGMA table_info(listings_raw)').map((c) => c.name);
+  if (!rawCols.includes('lastSeen')) {
+    db.run('ALTER TABLE listings_raw ADD COLUMN lastSeen TEXT');
+  }
+  const listingCols = all('PRAGMA table_info(listings)').map((c) => c.name);
+  if (!listingCols.includes('stale')) {
+    db.run('ALTER TABLE listings ADD COLUMN stale INTEGER DEFAULT 0');
+  }
+
   saveDb();
 }
 
@@ -124,6 +148,7 @@ function deserializeListing(row) {
   return {
     ...row,
     insideLuxembourg: row.insideLuxembourg != null ? Boolean(row.insideLuxembourg) : null,
+    stale: row.stale != null ? Boolean(row.stale) : false,
     pros: parseJson(row.pros, []),
     cons: parseJson(row.cons, []),
     dealbreakers: parseJson(row.dealbreakers, []),
@@ -134,17 +159,23 @@ function deserializeListing(row) {
 
 export async function upsertRaw(record) {
   await getDb();
+  const now = new Date().toISOString();
   const existing = get('SELECT htmlHash FROM listings_raw WHERE url = ?', [record.url]);
-  if (existing && existing.htmlHash === record.htmlHash) return { inserted: false };
+  if (existing && existing.htmlHash === record.htmlHash) {
+    db.run('UPDATE listings_raw SET lastSeen = ? WHERE url = ?', [now, record.url]);
+    maybeSave();
+    return { inserted: false };
+  }
   db.run(
-    `INSERT INTO listings_raw (url, html, screenshot, timestamp, source, htmlHash)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO listings_raw (url, html, screenshot, timestamp, source, htmlHash, lastSeen)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(url) DO UPDATE SET
        html=excluded.html, screenshot=excluded.screenshot,
-       timestamp=excluded.timestamp, source=excluded.source, htmlHash=excluded.htmlHash`,
-    [record.url, record.html, record.screenshot ?? null, record.timestamp, record.source, record.htmlHash]
+       timestamp=excluded.timestamp, source=excluded.source,
+       htmlHash=excluded.htmlHash, lastSeen=excluded.lastSeen`,
+    [record.url, record.html, null, record.timestamp, record.source, record.htmlHash, now]
   );
-  saveDb();
+  maybeSave();
   return { inserted: true };
 }
 
@@ -195,7 +226,7 @@ export async function upsertListing(record) {
       JSON.stringify(record.sentEvents ?? []), record.htmlHash ?? null,
     ]
   );
-  saveDb();
+  maybeSave();
 }
 
 export async function getListing(url) {
@@ -221,7 +252,7 @@ export async function updateListing(url, fields) {
   if (setClauses.length === 0) return;
   values.push(url);
   db.run(`UPDATE listings SET ${setClauses.join(', ')} WHERE url = ?`, values);
-  saveDb();
+  maybeSave();
 }
 
 export async function logSendEvent(listingUrl, event) {
@@ -231,7 +262,7 @@ export async function logSendEvent(listingUrl, event) {
   const events = parseJson(row.sentEvents, []);
   events.push({ ...event, timestamp: event.timestamp ?? new Date().toISOString() });
   db.run('UPDATE listings SET sentEvents = ? WHERE url = ?', [JSON.stringify(events), listingUrl]);
-  saveDb();
+  maybeSave();
 }
 
 export async function saveDraft(listingUrl, draft) {
@@ -242,7 +273,7 @@ export async function saveDraft(listingUrl, draft) {
   const newDraft = { id: draft.id ?? `draft_${Date.now()}`, createdAt: new Date().toISOString(), ...draft };
   drafts.push(newDraft);
   db.run('UPDATE listings SET messageDrafts = ? WHERE url = ?', [JSON.stringify(drafts), listingUrl]);
-  saveDb();
+  maybeSave();
   return newDraft;
 }
 
@@ -255,6 +286,22 @@ export async function updateDraft(listingUrl, draftId, fields) {
   if (index === -1) throw new Error(`Draft not found: ${draftId}`);
   drafts[index] = { ...drafts[index], ...fields, id: draftId, updatedAt: new Date().toISOString() };
   db.run('UPDATE listings SET messageDrafts = ? WHERE url = ?', [JSON.stringify(drafts), listingUrl]);
-  saveDb();
+  maybeSave();
   return drafts[index];
+}
+
+export async function markStaleListings(olderThanDays = 14) {
+  await getDb();
+  const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000).toISOString();
+  db.run(
+    'UPDATE listings SET stale = 1 WHERE url IN (SELECT url FROM listings_raw WHERE lastSeen IS NULL OR lastSeen < ?)',
+    [cutoff]
+  );
+  db.run(
+    'UPDATE listings SET stale = 0 WHERE url IN (SELECT url FROM listings_raw WHERE lastSeen >= ?)',
+    [cutoff]
+  );
+  maybeSave();
+  const row = get('SELECT COUNT(*) AS c FROM listings WHERE stale = 1');
+  return row ? row.c : 0;
 }

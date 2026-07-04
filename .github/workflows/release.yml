@@ -53,6 +53,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Strip quarantine flag from DMG
+        run: xattr -cr release/*.dmg
+
       - name: Upload macOS arm64 DMG
         uses: softprops/action-gh-release@v2
         with:

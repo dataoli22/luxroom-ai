@@ -150,7 +150,7 @@ export default function App() {
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {tab === 'listings' && <ListingsView />}
         {tab === 'approvals' && <ApprovalsView />}
-        {tab === 'log' && <LogView />}
+        {tab === 'log' && <LogView status={status} />}
         {tab === 'settings' && <SettingsView onEditProfile={handleEditProfile} />}
         {tab === 'help' && <HelpView />}
       </div>

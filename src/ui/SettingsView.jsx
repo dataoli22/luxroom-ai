@@ -162,7 +162,7 @@ export default function SettingsView({ onEditProfile }) {
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>Search Profile</div>
         <div style={{
-          background: c.infoBox ?? '#0d0d1a',
+          background: '#0d0d1a',
           border: '1px solid #2a2a4a',
           borderRadius: '10px',
           padding: '16px 20px',

@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS = {
   TELEGRAM_CHAT_ID: '',
   OLLAMA_BASE_URL: 'http://localhost:11434',
   OLLAMA_MODEL: 'qwen2.5-vl',
+  OLLAMA_API_KEY: '',
   SMTP_HOST: 'smtp.gmail.com',
   SMTP_PORT: '587',
   SMTP_USER: '',

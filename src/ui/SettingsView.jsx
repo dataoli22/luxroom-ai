@@ -114,6 +114,7 @@ export default function SettingsView({ onEditProfile }) {
     hermesModel: 'hermes3',
     ollamaUrl: 'http://localhost:11434',
     ollamaModel: 'qwen2.5-vl',
+    OLLAMA_API_KEY: '',
     telegramEnabled: false,
     telegramBotToken: '',
     telegramChatId: '',
@@ -400,6 +401,23 @@ export default function SettingsView({ onEditProfile }) {
               placeholder="qwen2.5-vl"
             />
           </Field>
+          <Field
+            label="Ollama API Key (optional — highly recommended)"
+            helper="Enables Ollama's hosted models when your laptop is low on memory. Get a free key at ollama.com → Settings → Keys. Leave blank to run fully local."
+            fullWidth
+          >
+            <input
+              type="password"
+              style={inputStyle}
+              value={form.OLLAMA_API_KEY || ''}
+              onChange={(e) => set('OLLAMA_API_KEY', e.target.value)}
+              placeholder="Paste your Ollama key — or leave blank for fully local"
+            />
+          </Field>
+          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: -4 }}>
+            <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com/settings/keys')}
+              style={linkBtnStyle}>Get your free Ollama key →</button>
+          </div>
           <div style={infoBoxStyle}>
             Ollama runs locally on your CPU. Install from{' '}
             <span style={{ color: '#8b5cf6' }}>ollama.com</span>, then run:{' '}

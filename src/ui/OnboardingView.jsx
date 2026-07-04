@@ -502,6 +502,7 @@ export default function OnboardingView({ onComplete }) {
   const [cloudApiKey, setCloudApiKey] = useState('')
   const [cloudModel, setCloudModel] = useState('')
   const [localModel, setLocalModel] = useState('')
+  const [ollamaApiKey, setOllamaApiKey] = useState('')
   const [notifyChannels, setNotifyChannels] = useState(['dashboard', 'desktop', 'email'])
   const [approvalMode, setApprovalMode] = useState('manual')
   const [saving, setSaving] = useState(false)
@@ -548,6 +549,7 @@ export default function OnboardingView({ onComplete }) {
         profile: finalProfile,
         INFERENCE_MODE: inferenceMode,
         OLLAMA_MODEL: localModel || undefined,
+        OLLAMA_API_KEY: ollamaApiKey.trim() || undefined,
         APPROVAL_MODE: approvalMode,
         ENABLE_EMAIL_NOTIFICATIONS: emailOn ? 'true' : 'false',
         ENABLE_DESKTOP_NOTIFICATIONS: notifyChannels.includes('desktop') ? 'true' : 'false',
@@ -634,6 +636,7 @@ export default function OnboardingView({ onComplete }) {
         emailCfg={emailCfg} setEmailCfg={setEmailCfg}
         hw={hw} hwDone={hwDone}
         inferenceMode={inferenceMode} localModel={localModel}
+        ollamaApiKey={ollamaApiKey} setOllamaApiKey={setOllamaApiKey}
         onCustomise={() => setFastMode(false)}
         onFinish={handleFinish}
         saving={saving}
@@ -832,7 +835,7 @@ const FAST_PRESETS_DISPLAY = [
   { icon: '🖥️', label: 'AI runs locally on your device' },
 ]
 
-function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inferenceMode, localModel, onCustomise, onFinish, saving }) {
+function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inferenceMode, localModel, ollamaApiKey, setOllamaApiKey, onCustomise, onFinish, saving }) {
   const preset      = getSmtpPreset(emailCfg.notificationEmail)
   const hasAt       = emailCfg.notificationEmail.includes('@')
   const knownDomain = preset !== null && hasAt
@@ -990,6 +993,34 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
                   {emailTest === 'fail' && <span style={{ color: '#f87171', fontSize: 12 }}>✗ Failed — check your App Password</span>}
                 </div>
               )}
+            </div>
+
+            {/* Ollama API key — optional but highly recommended */}
+            <div>
+              <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                Ollama API key
+                <span style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+                  color: '#6ee7b7', background: '#0d2b1a', border: '1px solid #1a4a1a',
+                  borderRadius: 10, padding: '2px 8px', textTransform: 'none',
+                }}>Optional · Highly recommended</span>
+                <Tooltip
+                  wide
+                  text={'A free Ollama account key lets LuxRoom AI use Ollama’s hosted models when your laptop is low on memory or the local model is slow — so analysis keeps working reliably at no cost. Sign in at ollama.com, open Settings → Keys, create a key, and paste it here. You can also add this later in Settings.'}
+                  link={'https://ollama.com/settings/keys'}
+                  linkLabel={'Get your free Ollama key →'}
+                />
+              </label>
+              <input
+                style={inputStyle}
+                type="password"
+                value={ollamaApiKey}
+                onChange={e => setOllamaApiKey(e.target.value)}
+                placeholder="Paste your Ollama key (recommended) — or leave blank to run fully local"
+              />
+              <p style={{ color: '#5a5a7a', fontSize: 12, margin: '5px 0 0', lineHeight: 1.5 }}>
+                Leave blank to run entirely on your own machine. Stored only on your device.
+              </p>
             </div>
 
             {/* AI status pill */}

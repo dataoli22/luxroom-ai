@@ -70,12 +70,15 @@ async function callLlm(prompt) {
   const baseUrl = s.OLLAMA_BASE_URL || 'http://localhost:11434';
   const model   = s.OLLAMA_MODEL   || 'llama3.2:3b';
   const opts    = { num_gpu: 0, temperature: 0.1, num_predict: 512 };
+  // Optional Ollama account key — enables hosted models; ignored by local servers.
+  const headers = { 'Content-Type': 'application/json' };
+  if (s.OLLAMA_API_KEY) headers.Authorization = `Bearer ${s.OLLAMA_API_KEY}`;
 
   // Prefer /api/chat — better JSON compliance
   try {
     const res = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content: prompt }],
@@ -94,7 +97,7 @@ async function callLlm(prompt) {
   // /api/generate fallback (older Ollama versions)
   const res = await fetch(`${baseUrl}/api/generate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ model, prompt, stream: false, options: opts }),
     signal: AbortSignal.timeout(50_000),
   });

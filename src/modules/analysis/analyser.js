@@ -182,10 +182,14 @@ async function callGemini(settings, systemPrompt, userMessage) {
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 }
 
-async function callOllamaGenerate(baseUrl, model, systemPrompt, userMessage) {
+async function callOllamaGenerate(baseUrl, model, systemPrompt, userMessage, apiKey) {
+  const headers = { "Content-Type": "application/json" };
+  // An Ollama account key (optional) enables Ollama's hosted models. Local
+  // servers ignore the header, so it is always safe to send when present.
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
   const res = await fetch(`${baseUrl}/api/generate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       model,
       prompt: systemPrompt + "\n\n" + userMessage,
@@ -205,14 +209,14 @@ async function callOllamaGenerate(baseUrl, model, systemPrompt, userMessage) {
 
 function callOllamaAnalysis(settings, systemPrompt, userMessage) {
   const baseUrl = settings.OLLAMA_BASE_URL || "http://localhost:11434";
-  return callOllamaGenerate(baseUrl, settings.OLLAMA_MODEL || "qwen2.5", systemPrompt, userMessage);
+  return callOllamaGenerate(baseUrl, settings.OLLAMA_MODEL || "qwen2.5", systemPrompt, userMessage, settings.OLLAMA_API_KEY);
 }
 
 // Hermes is a Nous Research model that also runs locally through Ollama — it is
 // tuned for clean structured/JSON output, so it makes a strong free analyser.
 function callHermes(settings, systemPrompt, userMessage) {
   const baseUrl = settings.OLLAMA_BASE_URL || "http://localhost:11434";
-  return callOllamaGenerate(baseUrl, settings.hermesModel || "hermes3", systemPrompt, userMessage);
+  return callOllamaGenerate(baseUrl, settings.hermesModel || "hermes3", systemPrompt, userMessage, settings.OLLAMA_API_KEY);
 }
 
 // Groq is an OpenAI-compatible endpoint with a generous free tier.

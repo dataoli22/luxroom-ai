@@ -73,11 +73,19 @@ function prepareHtml(html) {
 
 let _resolvedModel = null;
 
-async function isModelAvailable(baseUrl, model) {
+// An Ollama account key (optional) unlocks Ollama's hosted models. Local
+// servers ignore the header, so it is always safe to send when present.
+function ollamaHeaders(apiKey) {
+  const h = { 'Content-Type': 'application/json' };
+  if (apiKey) h.Authorization = `Bearer ${apiKey}`;
+  return h;
+}
+
+async function isModelAvailable(baseUrl, model, apiKey) {
   try {
     const res = await fetch(`${baseUrl}/api/show`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: ollamaHeaders(apiKey),
       body: JSON.stringify({ name: model }),
       signal: AbortSignal.timeout(5000),
     });
@@ -87,17 +95,17 @@ async function isModelAvailable(baseUrl, model) {
   }
 }
 
-async function resolveOllamaModel(baseUrl, configuredModel) {
+async function resolveOllamaModel(baseUrl, configuredModel, apiKey) {
   if (_resolvedModel) return _resolvedModel;
   // Prefer the model the user explicitly configured in setup, if available.
-  if (configuredModel && await isModelAvailable(baseUrl, configuredModel)) {
+  if (configuredModel && await isModelAvailable(baseUrl, configuredModel, apiKey)) {
     console.log(`[extractor] Using configured model: ${configuredModel}`);
     _resolvedModel = configuredModel;
     return configuredModel;
   }
   // Otherwise fall back to probing the known-good Hermes structured-output models.
   for (const m of HERMES_MODELS) {
-    if (await isModelAvailable(baseUrl, m)) {
+    if (await isModelAvailable(baseUrl, m, apiKey)) {
       console.log(`[extractor] Configured model unavailable — Hermes model available: ${m}`);
       _resolvedModel = m;
       return m;
@@ -108,10 +116,10 @@ async function resolveOllamaModel(baseUrl, configuredModel) {
   return configuredModel;
 }
 
-async function callOllama(baseUrl, model, prompt) {
+async function callOllama(baseUrl, model, prompt, apiKey) {
   const res = await fetch(`${baseUrl}/api/generate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: ollamaHeaders(apiKey),
     body: JSON.stringify({
       model,
       prompt,
@@ -130,8 +138,9 @@ async function callOllama(baseUrl, model, prompt) {
 
 async function extractLocal(prompt, settings) {
   const baseUrl = settings.OLLAMA_BASE_URL || 'http://localhost:11434';
-  const model   = await resolveOllamaModel(baseUrl, settings.OLLAMA_MODEL || 'qwen2.5');
-  return callOllama(baseUrl, model, prompt);
+  const apiKey  = settings.OLLAMA_API_KEY;
+  const model   = await resolveOllamaModel(baseUrl, settings.OLLAMA_MODEL || 'qwen2.5', apiKey);
+  return callOllama(baseUrl, model, prompt, apiKey);
 }
 
 // ---------------------------------------------------------------------------

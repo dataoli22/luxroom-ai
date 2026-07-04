@@ -80,6 +80,17 @@ const linkBtnStyle = {
   fontWeight: 500,
 };
 
+// Free-first ordering. `cost` drives the little tag under each picker button.
+const PROVIDERS = [
+  { id: 'ollama',    label: 'Ollama',    cost: 'Free · Local' },
+  { id: 'hermes',    label: 'Hermes',    cost: 'Free · Local' },
+  { id: 'groq',      label: 'Groq',      cost: 'Free tier' },
+  { id: 'gemini',    label: 'Gemini',    cost: 'Free tier' },
+  { id: 'anthropic', label: 'Anthropic', cost: 'Paid' },
+  { id: 'openai',    label: 'OpenAI',    cost: 'Paid' },
+];
+const costColor = (cost) => cost.startsWith('Free') ? '#6ee7b7' : '#f0a868';
+
 function Field({ label, helper, children, fullWidth }) {
   return (
     <div style={fullWidth ? { gridColumn: '1 / -1' } : {}}>
@@ -92,12 +103,15 @@ function Field({ label, helper, children, fullWidth }) {
 
 export default function SettingsView({ onEditProfile }) {
   const [form, setForm] = useState({
-    aiProvider: 'anthropic',
+    aiProvider: 'ollama',
     anthropicApiKey: '',
     openaiApiKey: '',
     openaiModel: 'gpt-4o',
     geminiApiKey: '',
     geminiModel: 'gemini-2.0-flash',
+    groqApiKey: '',
+    groqModel: 'llama-3.3-70b-versatile',
+    hermesModel: 'hermes3',
     ollamaUrl: 'http://localhost:11434',
     ollamaModel: 'qwen2.5-vl',
     telegramEnabled: false,
@@ -221,27 +235,37 @@ export default function SettingsView({ onEditProfile }) {
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>AI &amp; Analysis</div>
 
+        <p style={{ color: '#7a7a9a', fontSize: 13, margin: '0 0 14px', lineHeight: 1.6 }}>
+          Choose who analyses each listing. <span style={{ color: '#6ee7b7' }}>Local (Ollama / Hermes)</span> runs on your
+          laptop for free. <span style={{ color: '#6ee7b7' }}>Groq and Gemini</span> have generous free tiers.
+          Anthropic and OpenAI are paid per listing.
+        </p>
+
         {/* Provider picker */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-          {['anthropic', 'openai', 'gemini', 'ollama'].map(p => (
-            <button
-              key={p}
-              onClick={() => set('aiProvider', p)}
-              style={{
-                padding: '7px 18px', borderRadius: 20, cursor: 'pointer', fontSize: 13,
-                border: `1px solid ${form.aiProvider === p ? '#7c3aed' : '#2a2a3a'}`,
-                background: form.aiProvider === p ? '#7c3aed' : 'transparent',
-                color: form.aiProvider === p ? '#fff' : '#888',
-                fontWeight: form.aiProvider === p ? 600 : 400,
-                transition: 'all 0.15s',
-                textTransform: 'capitalize',
-              }}
-            >{p === 'ollama' ? 'Ollama (local)' : p.charAt(0).toUpperCase() + p.slice(1)}</button>
-          ))}
+          {PROVIDERS.map(p => {
+            const active = form.aiProvider === p.id;
+            return (
+              <button
+                key={p.id}
+                onClick={() => set('aiProvider', p.id)}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
+                  padding: '7px 16px', borderRadius: 12, cursor: 'pointer',
+                  border: `1px solid ${active ? '#7c3aed' : '#2a2a3a'}`,
+                  background: active ? '#7c3aed' : 'transparent',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <span style={{ fontSize: 13, fontWeight: active ? 700 : 500, color: active ? '#fff' : '#c8c8d8' }}>{p.label}</span>
+                <span style={{ fontSize: 10, fontWeight: 600, color: active ? 'rgba(255,255,255,0.85)' : costColor(p.cost) }}>{p.cost}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Anthropic */}
-        {(!form.aiProvider || form.aiProvider === 'anthropic') && (
+        {form.aiProvider === 'anthropic' && (
           <div style={gridStyle}>
             <Field label="Anthropic API Key" fullWidth>
               <input type="password" style={inputStyle} value={form.anthropicApiKey}
@@ -300,13 +324,55 @@ export default function SettingsView({ onEditProfile }) {
         {form.aiProvider === 'ollama' && (
           <div style={gridStyle}>
             <div style={{ gridColumn: '1 / -1', background: '#0d1a0d', border: '1px solid #1a4a1a', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#6ee7b7' }}>
-              Ollama runs entirely on your device — no API key needed. Configure it in the Local Extraction section below.
+              ✓ Free — Ollama runs entirely on your device, no API key needed. Set the model in the Local Extraction section below.
             </div>
             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
               <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com')}
                 style={linkBtnStyle}>Download Ollama → ollama.com</button>
               <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com/library')}
                 style={linkBtnStyle}>Browse models →</button>
+            </div>
+          </div>
+        )}
+
+        {/* Hermes (local, via Ollama) */}
+        {form.aiProvider === 'hermes' && (
+          <div style={gridStyle}>
+            <div style={{ gridColumn: '1 / -1', background: '#0d1a0d', border: '1px solid #1a4a1a', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#6ee7b7' }}>
+              ✓ Free — Hermes runs locally through Ollama and is tuned for clean JSON output, so it's a great analysis model. Pull it first, then it costs nothing to run.
+            </div>
+            <Field label="Hermes Model" helper="Runs via Ollama. Pull with:  ollama pull hermes3">
+              <input type="text" style={inputStyle} value={form.hermesModel || 'hermes3'}
+                onChange={(e) => set('hermesModel', e.target.value)} placeholder="hermes3" />
+            </Field>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com/library/hermes3')}
+                style={linkBtnStyle}>Get Hermes → ollama.com/library/hermes3</button>
+              <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com')}
+                style={linkBtnStyle}>Download Ollama →</button>
+            </div>
+          </div>
+        )}
+
+        {/* Groq (free cloud tier) */}
+        {form.aiProvider === 'groq' && (
+          <div style={gridStyle}>
+            <div style={{ gridColumn: '1 / -1', background: '#0d1a0d', border: '1px solid #1a4a1a', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#6ee7b7' }}>
+              ✓ Free tier — Groq offers fast cloud inference with a generous free allowance. Create a free key, no card required.
+            </div>
+            <Field label="Groq API Key" fullWidth>
+              <input type="password" style={inputStyle} value={form.groqApiKey || ''}
+                onChange={(e) => set('groqApiKey', e.target.value)} placeholder="gsk_..." />
+            </Field>
+            <Field label="Groq Model" helper="e.g. llama-3.3-70b-versatile, llama-3.1-8b-instant">
+              <input type="text" style={inputStyle} value={form.groqModel || 'llama-3.3-70b-versatile'}
+                onChange={(e) => set('groqModel', e.target.value)} placeholder="llama-3.3-70b-versatile" />
+            </Field>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <button onClick={() => window.luxroom?.shell?.openExternal('https://console.groq.com/keys')}
+                style={linkBtnStyle}>Get free API key → console.groq.com</button>
+              <button onClick={() => window.luxroom?.shell?.openExternal('https://console.groq.com/docs')}
+                style={linkBtnStyle}>Documentation →</button>
             </div>
           </div>
         )}

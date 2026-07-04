@@ -182,13 +182,12 @@ async function callGemini(settings, systemPrompt, userMessage) {
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 }
 
-async function callOllamaAnalysis(settings, systemPrompt, userMessage) {
-  const baseUrl = settings.OLLAMA_BASE_URL || "http://localhost:11434";
+async function callOllamaGenerate(baseUrl, model, systemPrompt, userMessage) {
   const res = await fetch(`${baseUrl}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: settings.OLLAMA_MODEL || "qwen2.5",
+      model,
       prompt: systemPrompt + "\n\n" + userMessage,
       stream: false,
       format: "json",
@@ -202,6 +201,46 @@ async function callOllamaAnalysis(settings, systemPrompt, userMessage) {
   }
   const data = await res.json();
   return data.response ?? "";
+}
+
+function callOllamaAnalysis(settings, systemPrompt, userMessage) {
+  const baseUrl = settings.OLLAMA_BASE_URL || "http://localhost:11434";
+  return callOllamaGenerate(baseUrl, settings.OLLAMA_MODEL || "qwen2.5", systemPrompt, userMessage);
+}
+
+// Hermes is a Nous Research model that also runs locally through Ollama — it is
+// tuned for clean structured/JSON output, so it makes a strong free analyser.
+function callHermes(settings, systemPrompt, userMessage) {
+  const baseUrl = settings.OLLAMA_BASE_URL || "http://localhost:11434";
+  return callOllamaGenerate(baseUrl, settings.hermesModel || "hermes3", systemPrompt, userMessage);
+}
+
+// Groq is an OpenAI-compatible endpoint with a generous free tier.
+async function callGroq(settings, systemPrompt, userMessage) {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${settings.groqApiKey}`,
+    },
+    body: JSON.stringify({
+      model: settings.groqModel || "llama-3.3-70b-versatile",
+      temperature: 0,
+      max_tokens: 1024,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+    }),
+    signal: AbortSignal.timeout(60000),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Groq error ${res.status}: ${body.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content ?? "";
 }
 
 // ---------------------------------------------------------------------------
@@ -254,18 +293,25 @@ export async function analyseListing(extractedRecord) {
   }
 
   // -------------------------------------------------------------------------
-  // Provider routing
+  // Provider routing — default is free/local (Ollama) to keep costs at zero.
   // -------------------------------------------------------------------------
-  let provider = (settings.aiProvider || "anthropic").toLowerCase();
+  let provider = (settings.aiProvider || "ollama").toLowerCase();
 
-  // Safe fallback: if a non-Anthropic provider is selected but its key is
-  // missing, fall back to Anthropic so analysis never silently stops.
+  // Safe fallback: if a cloud provider is selected but its API key is missing,
+  // fall back to free local Ollama so analysis never silently stops (and never
+  // starts costing money by surprise).
   if (provider === "openai" && !settings.openaiApiKey) {
-    console.warn("[analyser] OpenAI selected but no API key — falling back to Anthropic");
-    provider = "anthropic";
+    console.warn("[analyser] OpenAI selected but no API key — falling back to local Ollama");
+    provider = "ollama";
   } else if (provider === "gemini" && !settings.geminiApiKey) {
-    console.warn("[analyser] Gemini selected but no API key — falling back to Anthropic");
-    provider = "anthropic";
+    console.warn("[analyser] Gemini selected but no API key — falling back to local Ollama");
+    provider = "ollama";
+  } else if (provider === "groq" && !settings.groqApiKey) {
+    console.warn("[analyser] Groq selected but no API key — falling back to local Ollama");
+    provider = "ollama";
+  } else if (provider === "anthropic" && !(settings.anthropicApiKey || settings.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY)) {
+    console.warn("[analyser] Anthropic selected but no API key — falling back to local Ollama");
+    provider = "ollama";
   }
 
   let text;
@@ -274,15 +320,23 @@ export async function analyseListing(extractedRecord) {
       case "openai":
         text = await callOpenAI(settings, systemPrompt, userMessage);
         break;
+      case "groq":
+        text = await callGroq(settings, systemPrompt, userMessage);
+        break;
       case "gemini":
         text = await callGemini(settings, systemPrompt, userMessage);
+        break;
+      case "hermes":
+        text = await callHermes(settings, systemPrompt, userMessage);
         break;
       case "ollama":
         text = await callOllamaAnalysis(settings, systemPrompt, userMessage);
         break;
       case "anthropic":
-      default:
         text = await callAnthropic(settings, systemPrompt, userMessage);
+        break;
+      default:
+        text = await callOllamaAnalysis(settings, systemPrompt, userMessage);
         break;
     }
   } catch (err) {

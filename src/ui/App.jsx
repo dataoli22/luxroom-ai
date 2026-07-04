@@ -24,6 +24,8 @@ export default function App() {
   const [status, setStatus] = useState({ running: false, lastCrawl: null, listingCount: 0, scanCycles: 0 })
   const [runningNow, setRunningNow] = useState(false)
   const [scanToast, setScanToast] = useState(null)
+  const [scanInterval, setScanInterval] = useState(6)
+  const [showIntervalPicker, setShowIntervalPicker] = useState(false)
 
   // Onboarding state: null = loading, false = not done, true = done
   const [onboardingDone, setOnboardingDone] = useState(null)
@@ -59,17 +61,25 @@ export default function App() {
     return () => unsub?.()
   }, [])
 
-  // Load settings on mount to check onboarding status
+  // Load settings on mount to check onboarding status + saved interval
   useEffect(() => {
     window.luxroom?.settings.get().then(s => {
       const done = s?.profile?.onboardingDone === true
       setOnboardingDone(done)
       setShowOnboarding(!done)
+      const h = Number(s?.crawlIntervalHours || s?.CRAWL_INTERVAL_HOURS || 6)
+      if (h) setScanInterval(h)
     }).catch(() => {
       setOnboardingDone(false)
       setShowOnboarding(true)
     })
   }, [])
+
+  const handleSetInterval = async (hours) => {
+    setScanInterval(hours)
+    setShowIntervalPicker(false)
+    await window.luxroom?.settings.save({ crawlIntervalHours: hours }).catch(() => {})
+  }
 
   useEffect(() => {
     const poll = () => {
@@ -171,13 +181,41 @@ export default function App() {
           }}>
             {status.running ? 'Stop' : 'Start'}
           </button>
-          <button onClick={handleRunNow} disabled={runningNow} style={{
-            padding: '5px 14px', borderRadius: 6, border: 'none',
-            background: c.accent, color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-            opacity: runningNow ? 0.6 : 1,
-          }}>
-            {runningNow ? 'Running…' : 'Run Now'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+            <button onClick={handleRunNow} disabled={runningNow} style={{
+              padding: '5px 14px', borderRadius: '6px 0 0 6px', border: 'none',
+              background: c.accent, color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              opacity: runningNow ? 0.6 : 1,
+            }}>
+              {runningNow ? 'Running…' : 'Run Now'}
+            </button>
+            <button onClick={() => setShowIntervalPicker(v => !v)} style={{
+              padding: '5px 8px', borderRadius: '0 6px 6px 0', border: 'none',
+              borderLeft: '1px solid rgba(255,255,255,0.2)',
+              background: c.accent, color: '#fff', cursor: 'pointer', fontSize: 11,
+            }} title="Change scan frequency">
+              Every {scanInterval}h ▾
+            </button>
+            {showIntervalPicker && (
+              <div style={{
+                position: 'absolute', top: '100%', right: 0, marginTop: 4,
+                background: c.panel, border: `1px solid ${c.border}`, borderRadius: 8,
+                zIndex: 1000, minWidth: 130, overflow: 'hidden',
+              }}>
+                {[1, 3, 6, 12, 24].map(h => (
+                  <button key={h} onClick={() => handleSetInterval(h)} style={{
+                    display: 'block', width: '100%', textAlign: 'left',
+                    padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: 13,
+                    background: scanInterval === h ? '#2a1f4a' : 'transparent',
+                    color: scanInterval === h ? '#c4b5fd' : c.text,
+                    fontWeight: scanInterval === h ? 600 : 400,
+                  }}>
+                    Every {h}h{h === 6 ? ' (default)' : ''}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

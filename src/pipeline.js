@@ -182,9 +182,6 @@ export async function startPipeline() {
     processNewListings().catch((err) => logError('[pipeline] Unhandled error in cron run:', err));
   });
   _job.start();
-
-  // Run once immediately on startup
-  processNewListings().catch((err) => logError('[pipeline] Unhandled error in initial run:', err));
 }
 
 export function stopPipeline() {

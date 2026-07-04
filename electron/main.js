@@ -4,6 +4,17 @@
 // ESM→CJS static-link interop bugs in Electron's bundled runtime.
 
 const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, Notification, globalShortcut } = require('electron')
+
+function buildAppMenu() {
+  const isMac = process.platform === 'darwin'
+  const template = [
+    ...(isMac ? [{ role: 'appMenu' }] : []),
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
 const path     = require('path')
 const http     = require('http')
 const https    = require('https')
@@ -256,6 +267,7 @@ async function startApprovalServer() {
 // ─── App lifecycle ─────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
+  buildAppMenu()
   // Set userData path so settings.js can locate its config file
   process.env.ELECTRON_USER_DATA = app.getPath('userData')
 

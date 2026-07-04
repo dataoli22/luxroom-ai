@@ -916,12 +916,33 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
 
             <div>
               <label style={labelStyle}>
-                Email password or App Password
+                {knownDomain ? 'App Password' : 'Email password or App Password'}
                 <Tooltip {...appPasswordTooltip} />
               </label>
+
+              {/* Prominent callout for Gmail/known providers */}
+              {preset?.appPasswordLink && (
+                <div style={{
+                  background: '#1a1400', border: '1px solid #5a4400',
+                  borderLeft: '3px solid #fbbf24',
+                  borderRadius: 7, padding: '10px 13px', marginBottom: 8,
+                  fontSize: 13, lineHeight: 1.6,
+                }}>
+                  <span style={{ color: '#fbbf24', fontWeight: 700 }}>⚠ Do not use your regular password.</span>
+                  <span style={{ color: '#a89060' }}> {preset.note.replace(/Use a |Use an |Use your regular /, '')}</span>
+                  <br />
+                  <button
+                    onClick={() => window.luxroom?.shell?.openExternal(preset.appPasswordLink)}
+                    style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: 13, cursor: 'pointer', textDecoration: 'underline', padding: '4px 0 0', display: 'inline-block', fontWeight: 600 }}
+                  >
+                    Get your App Password here →
+                  </button>
+                </div>
+              )}
+
               <input style={inputStyle} type="password" value={emailCfg.smtpPassword}
                 onChange={e => setEmailCfg(p => ({ ...p, smtpPassword: e.target.value }))}
-                placeholder={knownDomain ? `${preset?.host?.split('.')[1] ?? 'email'} app password` : 'Your email password'}
+                placeholder={knownDomain ? 'Paste your app password here' : 'Your email password'}
                 onKeyDown={e => e.key === 'Enter' && canGo && onFinish()}
               />
               <p style={{ color: '#5a5a7a', fontSize: 12, margin: '5px 0 0', lineHeight: 1.5 }}>

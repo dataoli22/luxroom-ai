@@ -1,4 +1,4 @@
-import notifier from 'node-notifier';
+import { Notification } from 'electron';
 import nodemailer from 'nodemailer';
 
 const CORRIDOR_LABELS = {
@@ -172,14 +172,14 @@ export async function notifyTelegram(listing) {
 
 export async function notifyDesktop(listing) {
   const { verdict, location, rentTotal, opportunityScore } = listing;
-  return new Promise(resolve => {
-    try {
-      notifier.notify(
-        { title: `LuxRoom AI — ${verdict}`, message: `${location} · ${rentTotal} · Score ${opportunityScore}/10` },
-        err => resolve(!err)
-      );
-    } catch { resolve(false); }
-  });
+  try {
+    if (!Notification.isSupported()) return false;
+    new Notification({
+      title: `LuxRoom AI — ${verdict}`,
+      body: `${location} · ${rentTotal} · Score ${opportunityScore}/10`,
+    }).show();
+    return true;
+  } catch { return false; }
 }
 
 export async function notifyEmail(listing, draft) {

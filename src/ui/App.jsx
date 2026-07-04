@@ -69,9 +69,14 @@ export default function App() {
     }
   }
 
-  const handleOnboardingComplete = (profile) => {
+  const handleOnboardingComplete = async (profile) => {
     setOnboardingDone(true)
     setShowOnboarding(false)
+    // Auto-start the pipeline immediately after setup
+    try {
+      const s = await window.luxroom?.pipeline.start()
+      if (s) setStatus(s)
+    } catch {}
   }
 
   const handleEditProfile = () => {

@@ -3,7 +3,7 @@
 // ESM pipeline modules are loaded via dynamic import() to avoid Node.js v20
 // ESM→CJS static-link interop bugs in Electron's bundled runtime.
 
-const { app, BrowserWindow, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, Notification } = require('electron')
 const path     = require('path')
 const http     = require('http')
 const https    = require('https')
@@ -18,6 +18,44 @@ const execAsync = promisify(exec)
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
 let mainWindow = null
+let tray = null
+
+function createTrayIcon() {
+  // 16x16 purple square from raw RGBA buffer — no external file needed
+  const SIZE = 16
+  const buf = Buffer.alloc(SIZE * SIZE * 4)
+  for (let i = 0; i < SIZE * SIZE; i++) {
+    const x = i % SIZE, y = Math.floor(i / SIZE)
+    const cx = SIZE / 2, cy = SIZE / 2, r = SIZE / 2 - 1
+    const inside = Math.sqrt((x - cx + 0.5) ** 2 + (y - cy + 0.5) ** 2) < r
+    buf[i * 4]     = inside ? 0x7c : 0x00
+    buf[i * 4 + 1] = inside ? 0x5c : 0x00
+    buf[i * 4 + 2] = inside ? 0xbf : 0x00
+    buf[i * 4 + 3] = inside ? 0xff : 0x00
+  }
+  return nativeImage.createFromBuffer(buf, { width: SIZE, height: SIZE })
+}
+
+function showWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow()
+  } else {
+    mainWindow.show()
+    mainWindow.focus()
+  }
+}
+
+function buildTray() {
+  tray = new Tray(createTrayIcon())
+  tray.setToolTip('LuxRoom AI — housing scanner')
+  const menu = Menu.buildFromTemplate([
+    { label: 'Open LuxRoom AI', click: showWindow },
+    { type: 'separator' },
+    { label: 'Quit', click: () => { app.isQuiting = true; tray.destroy(); app.quit() } },
+  ])
+  tray.setContextMenu(menu)
+  tray.on('double-click', showWindow)
+}
 
 // ESM module refs — populated after app is ready
 let _settings, _pipeline, _db, _messaging, _hermes, _hardware
@@ -44,6 +82,21 @@ function createWindow() {
       webSecurity: true,
       allowRunningInsecureContent: false,
     },
+  })
+
+  // Hide to tray on close — keep pipeline running in background
+  mainWindow.on('close', (e) => {
+    if (!app.isQuiting) {
+      e.preventDefault()
+      mainWindow.hide()
+      if (tray && process.platform === 'win32') {
+        tray.displayBalloon({
+          title: 'LuxRoom AI is still running',
+          content: 'Scanning continues in the background. Right-click the tray icon to quit.',
+          iconType: 'info',
+        })
+      }
+    }
   })
 
   // Content Security Policy — block inline scripts and restrict sources
@@ -220,14 +273,18 @@ app.whenReady().then(async () => {
   }
 
   createWindow()
+  buildTray()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    else showWindow()
   })
 })
 
+// Hide to tray instead of quitting when window is closed
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  // Do nothing — keep the process alive for background scanning
+  // User must quit via tray menu or Cmd+Q
 })
 
 // ─── IPC handlers ─────────────────────────────────────────────────────────────

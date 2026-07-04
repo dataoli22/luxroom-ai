@@ -681,6 +681,21 @@ export default function OnboardingView({ onComplete }) {
                     One or more steps had an issue. You can retry from Settings → Configure Models, or the pipeline will fall back to cloud mode if configured.
                   </div>
                 )}
+                {!anyError && (
+                  <div style={{
+                    background: '#0d1a0d', border: '1px solid #1a4a1a',
+                    borderLeft: '3px solid #4ade80',
+                    borderRadius: 8, padding: '12px 16px', marginBottom: 16,
+                    fontSize: 13, color: '#6ee7b7', lineHeight: 1.7,
+                  }}>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>✓ You're all set</div>
+                    <div style={{ color: '#4a7a5a' }}>
+                      LuxRoom AI scans housing sites every 3 hours — <strong style={{ color: '#6ee7b7' }}>even when the window is closed.</strong>
+                      {' '}You'll get a desktop notification the moment a matching room is found.
+                      Close the window any time; it keeps running quietly in your system tray.
+                    </div>
+                  </div>
+                )}
                 <button
                   onClick={() => onComplete(finalProfile)}
                   style={{
@@ -690,7 +705,7 @@ export default function OnboardingView({ onComplete }) {
                     boxShadow: '0 4px 16px rgba(124,58,237,0.35)',
                   }}
                 >
-                  {anyError ? 'Continue anyway →' : 'Open LuxRoom AI →'}
+                  {anyError ? 'Continue anyway →' : 'Start scanning →'}
                 </button>
               </div>
             )}

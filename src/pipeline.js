@@ -116,7 +116,15 @@ export async function processNewListings() {
       continue;
     }
 
-    // Step h: high-opportunity path
+    // Step h: desktop ping for every new STRONG or CONSIDER listing
+    if (record.verdict === 'STRONG' || record.verdict === 'CONSIDER') {
+      try {
+        const { notifyDesktop } = await import('./modules/notifications/notifier.js');
+        notifyDesktop(record).catch(() => {});
+      } catch {}
+    }
+
+    // Step i: full notification + draft path for high-opportunity listings
     if (record.opportunityScore != null && record.opportunityScore > OPPORTUNITY_THRESHOLD) {
       log(`[pipeline] High opportunity listing found: ${record.location ?? label} score ${record.opportunityScore}`);
 

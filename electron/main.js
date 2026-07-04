@@ -461,6 +461,9 @@ const ALLOWED_EXTERNAL_DOMAINS = new Set([
   'ollama.com', 'console.groq.com', 'openrouter.ai', 'api.together.xyz',
   'myaccount.google.com', 'account.microsoft.com', 'login.yahoo.com',
   'appleid.apple.com', 'proton.me', 'protonmail.com',
+  'console.anthropic.com', 'docs.anthropic.com',
+  'platform.openai.com',
+  'aistudio.google.com', 'ai.google.dev',
 ])
 function isAllowedUrl(url) {
   try {

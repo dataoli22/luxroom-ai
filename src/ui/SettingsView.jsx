@@ -74,6 +74,12 @@ const checkboxStyle = {
   cursor: 'pointer',
 };
 
+const linkBtnStyle = {
+  background: 'none', border: 'none', color: '#818cf8',
+  fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: 0,
+  fontWeight: 500,
+};
+
 function Field({ label, helper, children, fullWidth }) {
   return (
     <div style={fullWidth ? { gridColumn: '1 / -1' } : {}}>
@@ -86,7 +92,12 @@ function Field({ label, helper, children, fullWidth }) {
 
 export default function SettingsView({ onEditProfile }) {
   const [form, setForm] = useState({
+    aiProvider: 'anthropic',
     anthropicApiKey: '',
+    openaiApiKey: '',
+    openaiModel: 'gpt-4o',
+    geminiApiKey: '',
+    geminiModel: 'gemini-2.0-flash',
     ollamaUrl: 'http://localhost:11434',
     ollamaModel: 'qwen2.5-vl',
     telegramEnabled: false,
@@ -147,13 +158,17 @@ export default function SettingsView({ onEditProfile }) {
 
   return (
     <div style={{
-      padding: '32px',
-      maxWidth: '780px',
-      margin: '0 auto',
-      color: '#e8e8f0',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      position: 'relative',
+      height: '100%',
+      overflowY: 'auto',
     }}>
+      <div style={{
+        padding: '32px',
+        maxWidth: '780px',
+        margin: '0 auto',
+        color: '#e8e8f0',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        position: 'relative',
+      }}>
       <h2 style={{ color: '#e8e8f0', fontSize: '22px', fontWeight: '700', marginBottom: '28px', marginTop: 0 }}>
         Settings
       </h2>
@@ -205,17 +220,96 @@ export default function SettingsView({ onEditProfile }) {
       {/* Section 1 — AI & Analysis */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>AI &amp; Analysis</div>
-        <div style={gridStyle}>
-          <Field label="Anthropic API Key" helper="Get yours at console.anthropic.com" fullWidth>
-            <input
-              type="password"
-              style={inputStyle}
-              value={form.anthropicApiKey}
-              onChange={(e) => set('anthropicApiKey', e.target.value)}
-              placeholder="sk-ant-..."
-            />
-          </Field>
+
+        {/* Provider picker */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+          {['anthropic', 'openai', 'gemini', 'ollama'].map(p => (
+            <button
+              key={p}
+              onClick={() => set('aiProvider', p)}
+              style={{
+                padding: '7px 18px', borderRadius: 20, cursor: 'pointer', fontSize: 13,
+                border: `1px solid ${form.aiProvider === p ? '#7c3aed' : '#2a2a3a'}`,
+                background: form.aiProvider === p ? '#7c3aed' : 'transparent',
+                color: form.aiProvider === p ? '#fff' : '#888',
+                fontWeight: form.aiProvider === p ? 600 : 400,
+                transition: 'all 0.15s',
+                textTransform: 'capitalize',
+              }}
+            >{p === 'ollama' ? 'Ollama (local)' : p.charAt(0).toUpperCase() + p.slice(1)}</button>
+          ))}
         </div>
+
+        {/* Anthropic */}
+        {(!form.aiProvider || form.aiProvider === 'anthropic') && (
+          <div style={gridStyle}>
+            <Field label="Anthropic API Key" fullWidth>
+              <input type="password" style={inputStyle} value={form.anthropicApiKey}
+                onChange={(e) => set('anthropicApiKey', e.target.value)} placeholder="sk-ant-..." />
+            </Field>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <button onClick={() => window.luxroom?.shell?.openExternal('https://console.anthropic.com')}
+                style={linkBtnStyle}>Get API key → console.anthropic.com</button>
+              <button onClick={() => window.luxroom?.shell?.openExternal('https://docs.anthropic.com')}
+                style={linkBtnStyle}>Documentation →</button>
+            </div>
+          </div>
+        )}
+
+        {/* OpenAI */}
+        {form.aiProvider === 'openai' && (
+          <div style={gridStyle}>
+            <Field label="OpenAI API Key" fullWidth>
+              <input type="password" style={inputStyle} value={form.openaiApiKey || ''}
+                onChange={(e) => set('openaiApiKey', e.target.value)} placeholder="sk-..." />
+            </Field>
+            <Field label="OpenAI Model" helper="e.g. gpt-4o, gpt-4o-mini">
+              <input type="text" style={inputStyle} value={form.openaiModel || 'gpt-4o'}
+                onChange={(e) => set('openaiModel', e.target.value)} placeholder="gpt-4o" />
+            </Field>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <button onClick={() => window.luxroom?.shell?.openExternal('https://platform.openai.com/api-keys')}
+                style={linkBtnStyle}>Get API key → platform.openai.com</button>
+              <button onClick={() => window.luxroom?.shell?.openExternal('https://platform.openai.com/docs')}
+                style={linkBtnStyle}>Documentation →</button>
+            </div>
+          </div>
+        )}
+
+        {/* Gemini */}
+        {form.aiProvider === 'gemini' && (
+          <div style={gridStyle}>
+            <Field label="Gemini API Key" fullWidth>
+              <input type="password" style={inputStyle} value={form.geminiApiKey || ''}
+                onChange={(e) => set('geminiApiKey', e.target.value)} placeholder="AIza..." />
+            </Field>
+            <Field label="Gemini Model" helper="e.g. gemini-2.0-flash, gemini-1.5-pro">
+              <input type="text" style={inputStyle} value={form.geminiModel || 'gemini-2.0-flash'}
+                onChange={(e) => set('geminiModel', e.target.value)} placeholder="gemini-2.0-flash" />
+            </Field>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <button onClick={() => window.luxroom?.shell?.openExternal('https://aistudio.google.com/app/apikey')}
+                style={linkBtnStyle}>Get API key → aistudio.google.com</button>
+              <button onClick={() => window.luxroom?.shell?.openExternal('https://ai.google.dev/gemini-api/docs')}
+                style={linkBtnStyle}>Documentation →</button>
+            </div>
+          </div>
+        )}
+
+        {/* Ollama (local) */}
+        {form.aiProvider === 'ollama' && (
+          <div style={gridStyle}>
+            <div style={{ gridColumn: '1 / -1', background: '#0d1a0d', border: '1px solid #1a4a1a', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#6ee7b7' }}>
+              Ollama runs entirely on your device — no API key needed. Configure it in the Local Extraction section below.
+            </div>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com')}
+                style={linkBtnStyle}>Download Ollama → ollama.com</button>
+              <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com/library')}
+                style={linkBtnStyle}>Browse models →</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Section 2 — Local Extraction */}
@@ -470,11 +564,11 @@ export default function SettingsView({ onEditProfile }) {
           fontWeight: '600',
           boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
           zIndex: 9999,
-          animation: 'fadeIn 0.2s ease',
         }}>
           {toast.msg}
         </div>
       )}
+      </div>
     </div>
   );
 }

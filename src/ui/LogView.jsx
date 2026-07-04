@@ -33,7 +33,7 @@ function formatDuration(ms) {
   return `${s}s`;
 }
 
-export default function LogView({ status = {} }) {
+export default function LogView({ status = {}, scanInterval = 6 }) {
   const [logLines, setLogLines] = useState([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const scrollRef = useRef(null);
@@ -43,8 +43,8 @@ export default function LogView({ status = {} }) {
   useEffect(() => { autoScrollRef.current = autoScroll; }, [autoScroll]);
 
   useEffect(() => {
-    if (!window.luxroom || typeof window.luxroom.onLine !== 'function') return;
-    const unsubscribe = window.luxroom.onLine((line) => {
+    if (!window.luxroom?.logs?.onLine) return;
+    const unsubscribe = window.luxroom.logs.onLine((line) => {
       setLogLines((prev) => {
         const next = [...prev, { text: line, time: new Date() }];
         return next.length > MAX_LINES ? next.slice(next.length - MAX_LINES) : next;
@@ -76,8 +76,7 @@ export default function LogView({ status = {} }) {
     });
   };
 
-  // Next scan countdown — pipeline runs every 3 hours
-  const INTERVAL_MS = 3 * 60 * 60 * 1000;
+  const INTERVAL_MS = scanInterval * 60 * 60 * 1000;
   const lastCrawlMs = status.lastCrawl ? new Date(status.lastCrawl).getTime() : null;
   const nextScanMs  = lastCrawlMs ? lastCrawlMs + INTERVAL_MS : null;
   const timeToNext  = nextScanMs ? nextScanMs - now : null;

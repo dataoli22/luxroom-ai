@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import ListingsView from './ListingsView.jsx'
 import ApprovalsView from './ApprovalsView.jsx'
 import LogView from './LogView.jsx'
@@ -26,6 +26,13 @@ export default function App() {
   const [scanToast, setScanToast] = useState(null)
   const [scanInterval, setScanInterval] = useState(6)
   const [showIntervalPicker, setShowIntervalPicker] = useState(false)
+  const [lastScanEmpty, setLastScanEmpty] = useState(false)
+  const [now, setNow] = useState(Date.now())
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   // Onboarding state: null = loading, false = not done, true = done
   const [onboardingDone, setOnboardingDone] = useState(null)
@@ -54,8 +61,11 @@ export default function App() {
     const unsub = window.luxroom?.scan?.onComplete((data) => {
       window.luxroom?.pipeline.status().then(setStatus).catch(() => {})
       if (data.savedCount > 0) {
+        setLastScanEmpty(false)
         setScanToast(`Found ${data.savedCount} listing${data.savedCount !== 1 ? 's' : ''} this scan`)
         setTimeout(() => setScanToast(null), 5000)
+      } else {
+        setLastScanEmpty(true)
       }
     })
     return () => unsub?.()
@@ -74,6 +84,20 @@ export default function App() {
       setShowOnboarding(true)
     })
   }, [])
+
+  function formatCountdown(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000))
+    const h = Math.floor(s / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    const sec = s % 60
+    if (h > 0) return `${h}h ${m}m`
+    if (m > 0) return `${m}m ${sec}s`
+    return `${sec}s`
+  }
+
+  const lastCrawlMs = status.lastCrawl ? new Date(status.lastCrawl).getTime() : null
+  const nextScanMs = lastCrawlMs ? lastCrawlMs + scanInterval * 3600 * 1000 : null
+  const timeToNext = nextScanMs ? nextScanMs - now : null
 
   const handleSetInterval = async (hours) => {
     setScanInterval(hours)
@@ -223,7 +247,7 @@ export default function App() {
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {tab === 'listings' && <ListingsView status={status} />}
         {tab === 'approvals' && <ApprovalsView />}
-        {tab === 'log' && <LogView status={status} />}
+        {tab === 'log' && <LogView status={status} scanInterval={scanInterval} />}
         {tab === 'settings' && <SettingsView onEditProfile={handleEditProfile} />}
         {tab === 'help' && <HelpView />}
       </div>
@@ -239,13 +263,22 @@ export default function App() {
       }}>
         <span>{status.listingCount} listing{status.listingCount !== 1 ? 's' : ''} in DB</span>
         {status.scanCycles > 0 && (
-          <span>{status.scanCycles} scan{status.scanCycles !== 1 ? 's' : ''} completed</span>
+          <span>{status.scanCycles} scan{status.scanCycles !== 1 ? 's' : ''} done</span>
         )}
-        {status.lastCrawl && (
-          <span>Last crawl: {new Date(status.lastCrawl).toLocaleTimeString()}</span>
+        {lastScanEmpty && !status.running && (
+          <span style={{ color: '#6b7280' }}>Last scan: no new listings</span>
         )}
-        <span style={{ marginLeft: 'auto', color: '#444' }}>1–5 switch tabs · Ctrl+R run now</span>
-        <span>LuxRoom AI — Open Source (MIT)</span>
+        {status.running && (
+          <span style={{ color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a78bfa', display: 'inline-block', animation: 'pulse 1.2s infinite' }} />
+            Scanning now…
+          </span>
+        )}
+        {!status.running && timeToNext !== null && timeToNext > 0 && (
+          <span style={{ color: '#a78bfa' }}>Next scan in {formatCountdown(timeToNext)}</span>
+        )}
+        <span style={{ marginLeft: 'auto', color: '#333' }}>1–5 tabs · Ctrl+R run</span>
+        <span>LuxRoom AI — MIT</span>
       </div>
 
       {/* Scan complete toast */}

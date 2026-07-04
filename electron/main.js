@@ -286,15 +286,25 @@ app.whenReady().then(async () => {
     }
   })
 
-  // Broadcast scan:complete to renderer and update tray badge
+  // Broadcast scan:complete to renderer, update tray badge, fire OS notification
   _pipeline.scanEmitter.on('complete', ({ savedCount, scanCycles }) => {
-    if (savedCount > 0) {
-      setUnreadBadge(_unreadCount + savedCount)
-    }
+    if (savedCount > 0) setUnreadBadge(_unreadCount + savedCount)
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('scan:complete', { savedCount, scanCycles })
     }
     updateTrayTooltip()
+
+    // Native OS popup for every completed scan
+    if (Notification.isSupported()) {
+      const n = new Notification({
+        title: savedCount > 0 ? `LuxRoom AI — ${savedCount} new listing${savedCount !== 1 ? 's' : ''} found` : 'LuxRoom AI — Scan complete',
+        body: savedCount > 0
+          ? `Tap to review your new listings  ·  Scan #${scanCycles}`
+          : `No new listings this scan  ·  Scan #${scanCycles}`,
+      })
+      n.on('click', showWindow)
+      n.show()
+    }
   })
 
   // Update tray tooltip every 60 seconds

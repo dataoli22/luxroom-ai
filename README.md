@@ -27,10 +27,9 @@ Pick your file:
 | Your computer | File to download |
 |---|---|
 | Windows (any modern PC) | `LuxRoom AI Setup x.x.x.exe` |
-| Mac — Apple Silicon (M1/M2/M3/M4) | `LuxRoom AI-x.x.x-arm64.dmg` |
-| Mac — Intel | `LuxRoom AI-x.x.x-x64.dmg` |
+| Mac (M1/M2/M3/M4 — Apple Silicon) | `LuxRoom AI-x.x.x-arm64.dmg` |
 
-> **Not sure which Mac you have?** Click the  menu → **About This Mac**. If it says "Apple M…" you have Apple Silicon. If it says "Intel" you have Intel.
+> **Intel Mac?** Not currently supported as a pre-built download. You can [build from source](#building-from-source) on any Mac.
 
 ---
 
@@ -53,7 +52,7 @@ Pick your file:
 
 ### macOS
 
-1. Download the correct `.dmg` for your chip (see table above)
+1. Download the `.dmg` from the [Releases](../../releases/latest) page
 2. Open the `.dmg` — a window appears with the LuxRoom AI icon
 3. Drag **LuxRoom AI** into the **Applications** folder shortcut in that window
 4. Open **Launchpad** (or go to Applications) and click LuxRoom AI

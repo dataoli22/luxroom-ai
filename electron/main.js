@@ -369,10 +369,10 @@ ipcMain.handle('setup:check-ollama', async () => {
 ipcMain.handle('setup:install-ollama', async () => {
   const platform = process.platform
 
-  // macOS: download Ollama.dmg, mount it, copy app to /Applications
+  // macOS: download zip, unzip directly into /Applications
   if (platform === 'darwin') {
     const tmpDir  = fs.mkdtempSync(path.join(os.tmpdir(), 'luxroom-ollama-'))
-    const tmpPath = path.join(tmpDir, 'Ollama.dmg')
+    const tmpPath = path.join(tmpDir, 'Ollama.zip')
     pushSetupProgress('install', 'Downloading Ollama…', 5)
 
     await new Promise((resolve, reject) => {
@@ -394,21 +394,21 @@ ipcMain.handle('setup:install-ollama', async () => {
           res.on('error', reject)
         }).on('error', reject)
       }
-      follow('https://ollama.com/download/Ollama-darwin.dmg')
+      follow('https://ollama.com/download/Ollama-darwin.zip')
     })
 
     pushSetupProgress('install', 'Installing Ollama…', 65)
     try {
       const { execFile } = require('child_process')
       const { promisify } = require('util')
-      // Mount DMG, copy .app to /Applications, unmount
-      const mountOut = await promisify(execFile)('hdiutil', ['attach', tmpPath, '-nobrowse', '-quiet'])
-      const mountPoint = mountOut.stdout.split('\t').pop().trim()
-      await promisify(execFile)('cp', ['-R', `${mountPoint}/Ollama.app`, '/Applications/Ollama.app'])
-      await promisify(execFile)('hdiutil', ['detach', mountPoint, '-quiet'])
+      await promisify(execFile)('unzip', ['-o', tmpPath, '-d', '/Applications'], { timeout: 60000 })
     } finally {
       try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
     }
+    // Launch Ollama in the background so it's ready for model pulls
+    try {
+      spawn('open', ['-a', 'Ollama'], { detached: true, stdio: 'ignore' }).unref()
+    } catch {}
     pushSetupProgress('install', 'Ollama installed ✓', 100)
     return { ok: true }
   }

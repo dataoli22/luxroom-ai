@@ -5,9 +5,10 @@ import LogView from './LogView.jsx'
 import SettingsView from './SettingsView.jsx'
 import OnboardingView from './OnboardingView.jsx'
 import ModelManagerView from './ModelManagerView.jsx'
+import HelpView from './HelpView.jsx'
 
-const TABS = ['listings', 'approvals', 'log', 'settings']
-const TAB_LABELS = { listings: '🏠 Listings', approvals: '✉️ Approvals', log: '📋 Log', settings: '⚙️ Settings' }
+const TABS = ['listings', 'approvals', 'log', 'settings', 'help']
+const TAB_LABELS = { listings: '🏠 Listings', approvals: '✉️ Approvals', log: '📋 Log', settings: '⚙️ Settings', help: '❓ Help' }
 
 const c = {
   bg: '#0f0f13',
@@ -151,6 +152,7 @@ export default function App() {
         {tab === 'approvals' && <ApprovalsView />}
         {tab === 'log' && <LogView />}
         {tab === 'settings' && <SettingsView onEditProfile={handleEditProfile} />}
+        {tab === 'help' && <HelpView />}
       </div>
 
       {/* Model manager overlay */}

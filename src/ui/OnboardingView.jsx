@@ -836,11 +836,21 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
   const preset      = getSmtpPreset(emailCfg.notificationEmail)
   const hasAt       = emailCfg.notificationEmail.includes('@')
   const knownDomain = preset !== null && hasAt
+  const [emailTest, setEmailTest] = useState(null)
 
   function onEmailChange(email) {
     setEmailCfg(p => ({ ...p, notificationEmail: email }))
     const p = getSmtpPreset(email)
     if (p) setEmailCfg(prev => ({ ...prev, notificationEmail: email, smtpHost: p.host, smtpPort: p.port, smtpSecure: p.secure }))
+  }
+
+  async function handleTestEmail() {
+    setEmailTest('testing')
+    try {
+      const r = await window.luxroom?.email?.test(emailCfg.notificationEmail)
+      setEmailTest(r?.ok !== false ? 'ok' : 'fail')
+    } catch { setEmailTest('fail') }
+    setTimeout(() => setEmailTest(null), 4000)
   }
 
   const canGo = profile.name.trim().length > 0 && hasAt && emailCfg.smtpPassword.length > 0
@@ -963,6 +973,23 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
               <p style={{ color: '#5a5a7a', fontSize: 12, margin: '5px 0 0', lineHeight: 1.5 }}>
                 Stored only on your device — only used to send you listing alerts.
               </p>
+              {emailCfg.smtpPassword.length > 0 && hasAt && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                  <button
+                    onClick={handleTestEmail}
+                    disabled={emailTest === 'testing'}
+                    style={{
+                      background: '#1a1a2e', border: '1px solid #3a3a5a',
+                      color: '#c4b5fd', padding: '7px 14px', borderRadius: 6,
+                      fontSize: 12, fontWeight: 600, cursor: emailTest === 'testing' ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {emailTest === 'testing' ? 'Sending…' : 'Send test email'}
+                  </button>
+                  {emailTest === 'ok' && <span style={{ color: '#4ade80', fontSize: 12 }}>✓ Email sent!</span>}
+                  {emailTest === 'fail' && <span style={{ color: '#f87171', fontSize: 12 }}>✗ Failed — check your App Password</span>}
+                </div>
+              )}
             </div>
 
             {/* AI status pill */}

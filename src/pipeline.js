@@ -11,6 +11,7 @@ import { initDb, upsertListing, saveDraft } from './db/database.js';
 
 export const logEmitter      = new EventEmitter();
 export const approvalsEmitter = new EventEmitter();
+export const scanEmitter      = new EventEmitter();
 
 function log(msg) {
   console.log(msg);
@@ -25,10 +26,11 @@ function logError(msg, err) {
 let _running = false;
 let _lastCrawl = null;
 let _listingCount = 0;
+let _scanCycles = 0;
 let _job = null;
 
 export function getPipelineStatus() {
-  return { running: _running, lastCrawl: _lastCrawl, listingCount: _listingCount };
+  return { running: _running, lastCrawl: _lastCrawl, listingCount: _listingCount, scanCycles: _scanCycles };
 }
 
 export async function processNewListings() {
@@ -38,6 +40,7 @@ export async function processNewListings() {
     : 0.7;
 
   _running = true;
+  let _savedThisCycle = 0;
   log(`[pipeline] Starting crawl — ${new Date().toISOString()}`);
 
   let rawRecords;
@@ -111,6 +114,7 @@ export async function processNewListings() {
     try {
       await upsertListing(record);
       _listingCount++;
+      _savedThisCycle++;
     } catch (err) {
       logError(`[pipeline] upsertListing() threw for ${label}:`, err);
       continue;
@@ -160,13 +164,15 @@ export async function processNewListings() {
 
   _lastCrawl = new Date().toISOString();
   _running = false;
+  _scanCycles++;
   log(`[pipeline] Crawl cycle complete — ${_lastCrawl}`);
+  scanEmitter.emit('complete', { savedCount: _savedThisCycle, scanCycles: _scanCycles });
 }
 
 export async function startPipeline() {
   if (_job) return;
   const config = getSettings();
-  const hours = parseInt(config.CRAWL_INTERVAL_HOURS ?? '3', 10);
+  const hours = parseInt(config.CRAWL_INTERVAL_HOURS ?? config.crawlIntervalHours ?? '3', 10);
   const cronPattern = `0 */${hours} * * *`;
 
   await initDb();

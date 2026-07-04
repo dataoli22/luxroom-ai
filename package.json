@@ -1,10 +1,10 @@
 {
   "name": "luxroom-ai",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Open-source automated housing agent for Luxembourg — find your room before September.",
   "main": "electron/main.bundle.js",
   "scripts": {
-    "build:main": "esbuild electron/main.js --bundle --platform=node --target=node20 --external:electron --external:nodemailer --outfile=electron/main.bundle.js",
+    "build:main": "esbuild electron/main.js --bundle --platform=node --target=node20 --external:electron --external:nodemailer --external:electron-updater --outfile=electron/main.bundle.js",
     "dev": "npm run build:main && concurrently \"vite\" \"wait-on http://localhost:5173 && node launch-electron.cjs\"",
     "build": "npm run build:main && vite build && electron-builder --win",
     "build:mac": "npm run build:main && vite build && electron-builder --mac",
@@ -19,6 +19,7 @@
     "@anthropic-ai/sdk": "^0.24.0",
     "cron": "^3.1.7",
     "dotenv": "^16.4.5",
+    "electron-updater": "^6.8.9",
     "node-fetch": "^3.3.2",
     "node-notifier": "^10.0.1",
     "nodemailer": "^6.9.13",

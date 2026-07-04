@@ -1,4 +1,4 @@
-import { Notification } from 'electron';
+import { Notification, BrowserWindow } from 'electron';
 import nodemailer from 'nodemailer';
 
 const CORRIDOR_LABELS = {
@@ -174,10 +174,15 @@ export async function notifyDesktop(listing) {
   const { verdict, location, rentTotal, opportunityScore } = listing;
   try {
     if (!Notification.isSupported()) return false;
-    new Notification({
+    const n = new Notification({
       title: `LuxRoom AI — ${verdict}`,
       body: `${location} · ${rentTotal} · Score ${opportunityScore}/10`,
-    }).show();
+    });
+    n.on('click', () => {
+      const wins = BrowserWindow.getAllWindows();
+      if (wins.length > 0) { wins[0].show(); wins[0].focus(); }
+    });
+    n.show();
     return true;
   } catch { return false; }
 }

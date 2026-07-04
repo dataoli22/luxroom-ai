@@ -43,4 +43,7 @@ linux:
   target: AppImage
   category: Utility
 
-publish: null
+publish:
+  provider: github
+  owner: dataoli22
+  repo: luxroom-ai

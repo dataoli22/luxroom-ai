@@ -3,7 +3,7 @@
 // ESM pipeline modules are loaded via dynamic import() to avoid Node.js v20
 // ESM→CJS static-link interop bugs in Electron's bundled runtime.
 
-const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, Notification } = require('electron')
+const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, Notification, globalShortcut } = require('electron')
 const path     = require('path')
 const http     = require('http')
 const https    = require('https')
@@ -19,6 +19,35 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
 let mainWindow = null
 let tray = null
+let _unreadCount = 0
+
+function updateTrayTooltip() {
+  if (!tray || tray.isDestroyed()) return;
+  try {
+    const s = _pipeline ? _pipeline.getPipelineStatus() : null;
+    if (!s) return;
+    const parts = ['LuxRoom AI'];
+    if (s.running) {
+      parts.push('Scanning now…');
+    } else if (s.lastCrawl) {
+      const diffMs = Date.now() - new Date(s.lastCrawl).getTime();
+      const diffMin = Math.floor(diffMs / 60000);
+      parts.push(diffMin < 60 ? `Last scan ${diffMin}m ago` : `Last scan ${Math.floor(diffMin / 60)}h ago`);
+    } else {
+      parts.push('Not started');
+    }
+    if (_unreadCount > 0) parts.push(`${_unreadCount} new listing${_unreadCount !== 1 ? 's' : ''}`);
+    tray.setToolTip(parts.join(' · '));
+  } catch {}
+}
+
+function setUnreadBadge(count) {
+  _unreadCount = count;
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setBadge(count > 0 ? String(count) : '');
+  }
+  updateTrayTooltip();
+}
 
 function createTrayIcon() {
   // 16x16 purple square from raw RGBA buffer — no external file needed
@@ -43,6 +72,8 @@ function showWindow() {
     mainWindow.show()
     mainWindow.focus()
   }
+  // Clear unread badge when user opens window
+  setUnreadBadge(0)
 }
 
 function buildTray() {
@@ -243,6 +274,20 @@ app.whenReady().then(async () => {
     }
   })
 
+  // Broadcast scan:complete to renderer and update tray badge
+  _pipeline.scanEmitter.on('complete', ({ savedCount, scanCycles }) => {
+    if (savedCount > 0) {
+      setUnreadBadge(_unreadCount + savedCount)
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('scan:complete', { savedCount, scanCycles })
+    }
+    updateTrayTooltip()
+  })
+
+  // Update tray tooltip every 60 seconds
+  setInterval(updateTrayTooltip, 60000)
+
   // Push approvals:updated when the pipeline creates a new draft
   if (_pipeline.approvalsEmitter) {
     _pipeline.approvalsEmitter.on('updated', pushApprovalsUpdated)
@@ -275,9 +320,26 @@ app.whenReady().then(async () => {
   createWindow()
   buildTray()
 
+  // Keyboard shortcut: Ctrl/Cmd+R → Run Now
+  globalShortcut.register('CommandOrControl+R', () => {
+    if (_pipeline) {
+      _pipeline.processNewListings().catch(err => console.error('[main] shortcut run-now error:', err))
+    }
+  })
+
+  // Auto-updater (GitHub releases)
+  try {
+    const { autoUpdater } = require('electron-updater')
+    autoUpdater.checkForUpdatesAndNotify().catch(() => {})
+  } catch {}
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
     else showWindow()
+  })
+
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll()
   })
 })
 
@@ -292,9 +354,18 @@ app.on('window-all-closed', () => {
 ipcMain.handle('settings:get', async () => _settings.getSettings())
 
 ipcMain.handle('settings:save', async (_e, partial) => {
+  const prev = _settings.getSettings()
   _settings.saveSettings(partial)
   _settings.applyToEnv(_settings.getSettings())
-  return _settings.getSettings()
+  // Restart pipeline if crawl interval changed while running
+  const next = _settings.getSettings()
+  const prevHours = prev.CRAWL_INTERVAL_HOURS ?? prev.crawlIntervalHours
+  const nextHours = next.CRAWL_INTERVAL_HOURS ?? next.crawlIntervalHours
+  if (prevHours !== nextHours && _pipeline.getPipelineStatus().running) {
+    _pipeline.stopPipeline()
+    await _pipeline.startPipeline()
+  }
+  return next
 })
 
 ipcMain.handle('pipeline:start', async () => {
@@ -403,6 +474,14 @@ ipcMain.handle('shell:open-external', (_e, url) => {
     console.warn('[security] blocked openExternal:', url)
     return
   }
+  return shell.openExternal(url)
+})
+
+// Open housing listing URLs (from our own DB — any https:// URL is safe)
+ipcMain.handle('listings:open-url', (_e, url) => {
+  let parsed
+  try { parsed = new URL(url) } catch { return }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return
   return shell.openExternal(url)
 })
 

@@ -156,7 +156,7 @@ function ListingCard({ listing, onDraftCreated }) {
     if (!url) return;
     setDraftLoading(true);
     try {
-      await window.luxroom.generateDraft(url, 'introduction');
+      await window.luxroom.approvals.generateDraft(url, 'introduction');
       onDraftCreated('Draft created — check Approvals tab');
     } catch (e) {
       onDraftCreated('Error creating draft');
@@ -169,8 +169,13 @@ function ListingCard({ listing, onDraftCreated }) {
     ? new Date(analyzedAt).toLocaleString()
     : null;
 
+  const openListing = () => {
+    if (url) window.luxroom?.listings?.openUrl(url);
+  };
+
   return (
     <div
+      role="article"
       style={{
         backgroundColor: '#0f172a',
         border: '1px solid #1e293b',
@@ -180,7 +185,9 @@ function ListingCard({ listing, onDraftCreated }) {
         flexDirection: 'column',
         gap: 12,
         transition: 'border-color 0.15s',
+        cursor: url ? 'pointer' : 'default',
       }}
+      onClick={(e) => { if (!e.target.closest('button') && url) openListing(); }}
       onMouseEnter={e => (e.currentTarget.style.borderColor = '#334155')}
       onMouseLeave={e => (e.currentTarget.style.borderColor = '#1e293b')}
     >
@@ -347,19 +354,16 @@ function ListingCard({ listing, onDraftCreated }) {
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           {url && (
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={(e) => { e.stopPropagation(); openListing(); }}
               style={{
-                color: '#818cf8',
-                fontSize: 12,
-                textDecoration: 'none',
-                fontWeight: 500,
+                background: 'none', border: 'none',
+                color: '#818cf8', fontSize: 12, cursor: 'pointer', fontWeight: 500,
+                padding: 0,
               }}
             >
               Open listing ↗
-            </a>
+            </button>
           )}
           <button
             onClick={handleDraft}
@@ -393,7 +397,7 @@ export default function ListingsView({ status = {} }) {
 
   const fetchListings = useCallback(async () => {
     try {
-      const data = await window.luxroom.getAll();
+      const data = await window.luxroom.listings.getAll();
       setListings(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error('Failed to fetch listings:', e);

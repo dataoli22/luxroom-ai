@@ -21,13 +21,43 @@ const c = {
 
 export default function App() {
   const [tab, setTab] = useState('listings')
-  const [status, setStatus] = useState({ running: false, lastCrawl: null, listingCount: 0 })
+  const [status, setStatus] = useState({ running: false, lastCrawl: null, listingCount: 0, scanCycles: 0 })
   const [runningNow, setRunningNow] = useState(false)
+  const [scanToast, setScanToast] = useState(null)
 
   // Onboarding state: null = loading, false = not done, true = done
   const [onboardingDone, setOnboardingDone] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showModels, setShowModels] = useState(false)
+
+  // Keyboard shortcuts: 1-5 switch tabs, Ctrl/Cmd+R = Run Now
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (e.key >= '1' && e.key <= '5') {
+        const idx = Number(e.key) - 1
+        if (TABS[idx]) setTab(TABS[idx])
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault()
+        window.luxroom?.pipeline.runNow().catch(() => {})
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Subscribe to scan:complete for toast and status refresh
+  useEffect(() => {
+    const unsub = window.luxroom?.scan?.onComplete((data) => {
+      window.luxroom?.pipeline.status().then(setStatus).catch(() => {})
+      if (data.savedCount > 0) {
+        setScanToast(`Found ${data.savedCount} listing${data.savedCount !== 1 ? 's' : ''} this scan`)
+        setTimeout(() => setScanToast(null), 5000)
+      }
+    })
+    return () => unsub?.()
+  }, [])
 
   // Load settings on mount to check onboarding status
   useEffect(() => {
@@ -170,11 +200,28 @@ export default function App() {
         fontSize: 11, color: c.sub, gap: 16, flexShrink: 0,
       }}>
         <span>{status.listingCount} listing{status.listingCount !== 1 ? 's' : ''} in DB</span>
+        {status.scanCycles > 0 && (
+          <span>{status.scanCycles} scan{status.scanCycles !== 1 ? 's' : ''} completed</span>
+        )}
         {status.lastCrawl && (
           <span>Last crawl: {new Date(status.lastCrawl).toLocaleTimeString()}</span>
         )}
-        <span style={{ marginLeft: 'auto' }}>LuxRoom AI — Open Source (MIT)</span>
+        <span style={{ marginLeft: 'auto', color: '#444' }}>1–5 switch tabs · Ctrl+R run now</span>
+        <span>LuxRoom AI — Open Source (MIT)</span>
       </div>
+
+      {/* Scan complete toast */}
+      {scanToast && (
+        <div style={{
+          position: 'fixed', bottom: 48, left: '50%', transform: 'translateX(-50%)',
+          background: '#1a2e1a', border: '1px solid #4ade80', color: '#4ade80',
+          padding: '10px 22px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+          zIndex: 9999, boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+          pointerEvents: 'none',
+        }}>
+          {scanToast}
+        </div>
+      )}
     </div>
   )
 }

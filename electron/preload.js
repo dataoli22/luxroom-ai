@@ -16,6 +16,15 @@ contextBridge.exposeInMainWorld('luxroom', {
   listings: {
     getAll: () => ipcRenderer.invoke('listings:get-all'),
     get: (url) => ipcRenderer.invoke('listings:get', url),
+    openUrl: (url) => ipcRenderer.invoke('listings:open-url', url),
+  },
+
+  scan: {
+    onComplete: (callback) => {
+      const handler = (_, data) => callback(data);
+      ipcRenderer.on('scan:complete', handler);
+      return () => ipcRenderer.removeListener('scan:complete', handler);
+    },
   },
 
   approvals: {

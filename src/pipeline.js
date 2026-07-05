@@ -98,8 +98,13 @@ export async function processNewListings() {
         return { saved: false };
       }
 
-      // Step e: score — analyser outputs `score`, scorer expects `housingScore`
-      const analysedWithHousingScore = { ...analysed, housingScore: analysed.score ?? 0 };
+      // Step e: score — analyser outputs `score`, scorer expects `housingScore`.
+      // Pass the user's budget so price scoring scales to their target.
+      const analysedWithHousingScore = {
+        ...analysed,
+        housingScore: analysed.score ?? 0,
+        maxBudget: Number(config.profile?.maxBudget) || null,
+      };
       let scores;
       try {
         scores = await scoreOpportunity(analysedWithHousingScore);

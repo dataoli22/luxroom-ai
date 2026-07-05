@@ -26,9 +26,9 @@ const LANG_FLAGS = {
 
 function VerdictBadge({ verdict }) {
   const color =
-    verdict === 'APPLY' ? PALETTE.green :
+    verdict === 'STRONG' ? PALETTE.green :
     verdict === 'SKIP' ? PALETTE.red :
-    PALETTE.gold;
+    PALETTE.gold; // CONSIDER (and anything else) → gold
   return (
     <span style={{
       background: color + '22',
@@ -99,6 +99,10 @@ function PendingCard({ item, onApprove, onDiscard, onGenerateNew }) {
   const { listing, draft } = item;
   const langCode = draft.language ? draft.language.toUpperCase() : 'EN';
   const flag = LANG_FLAGS[langCode] || '🌐';
+
+  const originalBody = draft.body || draft.message || draft.text || '';
+  const [body, setBody] = useState(originalBody);
+  const edited = body.trim() !== originalBody.trim();
 
   const generatedAt = draft.generatedAt
     ? new Date(draft.generatedAt).toLocaleString()
@@ -187,14 +191,15 @@ function PendingCard({ item, onApprove, onDiscard, onGenerateNew }) {
         </div>
 
         <textarea
-          readOnly
-          value={draft.body || draft.message || draft.text || ''}
+          value={body}
+          onChange={e => setBody(e.target.value)}
+          spellCheck={false}
           style={{
             width: '100%',
             minHeight: 120,
             background: '#0d1020',
             color: PALETTE.text,
-            border: `1px solid ${PALETTE.border}`,
+            border: `1px solid ${edited ? PALETTE.accent : PALETTE.border}`,
             borderRadius: 8,
             padding: '12px 14px',
             fontSize: 14,
@@ -206,16 +211,25 @@ function PendingCard({ item, onApprove, onDiscard, onGenerateNew }) {
           }}
         />
 
-        {generatedAt && (
-          <div style={{ color: PALETTE.textMuted, fontSize: 12, marginTop: 6 }}>
-            Generated at {generatedAt}
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+          <span style={{ color: PALETTE.textMuted, fontSize: 12 }}>
+            ✎ Edit the message freely before sending.
+          </span>
+          {edited && (
+            <span style={{ color: PALETTE.accent, fontSize: 12, fontWeight: 600 }}>Edited</span>
+          )}
+          {generatedAt && (
+            <span style={{ color: PALETTE.textMuted, fontSize: 12, marginLeft: 'auto' }}>
+              Generated at {generatedAt}
+            </span>
+          )}
+        </div>
 
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
           <button
-            onClick={() => onApprove(listing.url, draft.id)}
+            onClick={() => onApprove(listing.url, draft.id, body)}
+            disabled={!body.trim()}
             style={{
               background: PALETTE.greenDim,
               color: PALETTE.green,
@@ -224,11 +238,12 @@ function PendingCard({ item, onApprove, onDiscard, onGenerateNew }) {
               padding: '9px 20px',
               fontSize: 14,
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: body.trim() ? 'pointer' : 'not-allowed',
+              opacity: body.trim() ? 1 : 0.5,
               transition: 'opacity 0.15s',
             }}
-            onMouseOver={e => e.currentTarget.style.opacity = '0.8'}
-            onMouseOut={e => e.currentTarget.style.opacity = '1'}
+            onMouseOver={e => { if (body.trim()) e.currentTarget.style.opacity = '0.8' }}
+            onMouseOut={e => { if (body.trim()) e.currentTarget.style.opacity = '1' }}
           >
             ✓ Approve &amp; Send
           </button>
@@ -388,9 +403,12 @@ export default function ApprovalsView() {
     };
   }, [fetchPending]);
 
-  const handleApprove = useCallback(async (listingUrl, draftId) => {
+  const handleApprove = useCallback(async (listingUrl, draftId, body) => {
+    // Sending to a landlord is outward-facing and irreversible — confirm first.
+    const ok = window.confirm('Send this message to the landlord now?\n\nThis will be sent from your email / the listing contact form and cannot be undone.');
+    if (!ok) return;
     try {
-      await window.luxroom?.approvals.approve(listingUrl, draftId);
+      await window.luxroom?.approvals.approve(listingUrl, draftId, body);
       setPending(prev => prev.filter(
         item => !(item.listing.url === listingUrl && item.draft.id === draftId)
       ));

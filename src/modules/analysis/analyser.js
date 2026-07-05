@@ -1,6 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
-import fetch from "node-fetch";
 import { getSettings } from "../../settings.js";
+import { complete } from "../ai/complete.js";
 
 // ---------------------------------------------------------------------------
 // Dynamic system prompt — built from the user's onboarding profile
@@ -114,140 +113,6 @@ function parseAnalysis(text) {
 }
 
 // ---------------------------------------------------------------------------
-// Provider model calls — each returns the raw response text (or throws)
-// ---------------------------------------------------------------------------
-
-async function callAnthropic(settings, systemPrompt, userMessage) {
-  const client = new Anthropic({
-    apiKey:
-      settings.anthropicApiKey ||
-      settings.ANTHROPIC_API_KEY ||
-      process.env.ANTHROPIC_API_KEY,
-  });
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1024,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userMessage }],
-  });
-  return response.content?.[0]?.text ?? "";
-}
-
-async function callOpenAI(settings, systemPrompt, userMessage) {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${settings.openaiApiKey}`,
-    },
-    body: JSON.stringify({
-      model: settings.openaiModel || "gpt-4o",
-      temperature: 0,
-      max_tokens: 1024,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-    }),
-    signal: AbortSignal.timeout(60000),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`OpenAI error ${res.status}: ${body.slice(0, 300)}`);
-  }
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? "";
-}
-
-async function callGemini(settings, systemPrompt, userMessage) {
-  const model = settings.geminiModel || "gemini-2.0-flash";
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.geminiApiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: "user", parts: [{ text: userMessage }] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 1024 },
-      }),
-      signal: AbortSignal.timeout(60000),
-    }
-  );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Gemini error ${res.status}: ${body.slice(0, 300)}`);
-  }
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-}
-
-async function callOllamaGenerate(baseUrl, model, systemPrompt, userMessage, apiKey) {
-  const headers = { "Content-Type": "application/json" };
-  // An Ollama account key (optional) enables Ollama's hosted models. Local
-  // servers ignore the header, so it is always safe to send when present.
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-  const res = await fetch(`${baseUrl}/api/generate`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model,
-      prompt: systemPrompt + "\n\n" + userMessage,
-      stream: false,
-      format: "json",
-      options: { num_gpu: 0, temperature: 0 },
-    }),
-    signal: AbortSignal.timeout(60000),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Ollama error ${res.status}: ${body.slice(0, 300)}`);
-  }
-  const data = await res.json();
-  return data.response ?? "";
-}
-
-function callOllamaAnalysis(settings, systemPrompt, userMessage) {
-  const baseUrl = settings.OLLAMA_BASE_URL || "http://localhost:11434";
-  return callOllamaGenerate(baseUrl, settings.OLLAMA_MODEL || "qwen2.5", systemPrompt, userMessage, settings.OLLAMA_API_KEY);
-}
-
-// Hermes is a Nous Research model that also runs locally through Ollama — it is
-// tuned for clean structured/JSON output, so it makes a strong free analyser.
-function callHermes(settings, systemPrompt, userMessage) {
-  const baseUrl = settings.OLLAMA_BASE_URL || "http://localhost:11434";
-  return callOllamaGenerate(baseUrl, settings.hermesModel || "hermes3", systemPrompt, userMessage, settings.OLLAMA_API_KEY);
-}
-
-// Groq is an OpenAI-compatible endpoint with a generous free tier.
-async function callGroq(settings, systemPrompt, userMessage) {
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${settings.groqApiKey}`,
-    },
-    body: JSON.stringify({
-      model: settings.groqModel || "llama-3.3-70b-versatile",
-      temperature: 0,
-      max_tokens: 1024,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-    }),
-    signal: AbortSignal.timeout(60000),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Groq error ${res.status}: ${body.slice(0, 300)}`);
-  }
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? "";
-}
-
-// ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
 
@@ -297,52 +162,11 @@ export async function analyseListing(extractedRecord) {
   }
 
   // -------------------------------------------------------------------------
-  // Provider routing — default is free/local (Ollama) to keep costs at zero.
+  // Run through the shared provider layer (free-first, with safe fallback).
   // -------------------------------------------------------------------------
-  let provider = (settings.aiProvider || "ollama").toLowerCase();
-
-  // Safe fallback: if a cloud provider is selected but its API key is missing,
-  // fall back to free local Ollama so analysis never silently stops (and never
-  // starts costing money by surprise).
-  if (provider === "openai" && !settings.openaiApiKey) {
-    console.warn("[analyser] OpenAI selected but no API key — falling back to local Ollama");
-    provider = "ollama";
-  } else if (provider === "gemini" && !settings.geminiApiKey) {
-    console.warn("[analyser] Gemini selected but no API key — falling back to local Ollama");
-    provider = "ollama";
-  } else if (provider === "groq" && !settings.groqApiKey) {
-    console.warn("[analyser] Groq selected but no API key — falling back to local Ollama");
-    provider = "ollama";
-  } else if (provider === "anthropic" && !(settings.anthropicApiKey || settings.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY)) {
-    console.warn("[analyser] Anthropic selected but no API key — falling back to local Ollama");
-    provider = "ollama";
-  }
-
   let text;
   try {
-    switch (provider) {
-      case "openai":
-        text = await callOpenAI(settings, systemPrompt, userMessage);
-        break;
-      case "groq":
-        text = await callGroq(settings, systemPrompt, userMessage);
-        break;
-      case "gemini":
-        text = await callGemini(settings, systemPrompt, userMessage);
-        break;
-      case "hermes":
-        text = await callHermes(settings, systemPrompt, userMessage);
-        break;
-      case "ollama":
-        text = await callOllamaAnalysis(settings, systemPrompt, userMessage);
-        break;
-      case "anthropic":
-        text = await callAnthropic(settings, systemPrompt, userMessage);
-        break;
-      default:
-        text = await callOllamaAnalysis(settings, systemPrompt, userMessage);
-        break;
-    }
+    text = await complete(settings, systemPrompt, userMessage, { json: true, maxTokens: 1024 });
   } catch (err) {
     console.error("[analyser] API call failed:", err.message);
     return null;

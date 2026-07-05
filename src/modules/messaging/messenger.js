@@ -3,13 +3,9 @@
  * Generates draft outreach messages for approved listings.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { randomUUID } from 'crypto';
 import { getSettings } from '../../settings.js';
-
-const client = new Anthropic();
-
-const MODEL = 'claude-sonnet-4-6';
+import { complete } from '../ai/complete.js';
 
 function buildSystemPrompt(profile = {}) {
   const name = profile.name?.trim() || 'the applicant';
@@ -96,16 +92,17 @@ export function detectLanguage(rawDescription) {
  * @returns {string}
  */
 function condenseListing(listing) {
+  // Use the ACTUAL ListingRecord field names (see src/db/database.js) so the
+  // draft can accurately reference rent, availability, area, etc.
   const keys = [
-    'id', 'title', 'price', 'currency', 'location', 'city', 'district',
-    'type', 'size', 'rooms', 'availableFrom', 'furnished',
-    'contactName', 'contactEmail', 'contactPhone',
-    'rawDescription',
+    'listingTitle', 'location', 'corridor', 'rentTotal', 'availability',
+    'estimatedCommute', 'furnished', 'genderPolicy', 'contactName',
+    'insideLuxembourg', 'rawDescription',
   ];
 
   const condensed = {};
   for (const key of keys) {
-    if (listing[key] !== undefined && listing[key] !== null) {
+    if (listing[key] !== undefined && listing[key] !== null && listing[key] !== 'unknown') {
       condensed[key] = listing[key];
     }
   }
@@ -147,23 +144,9 @@ export async function generateDraft(listing, type = 'introduction') {
   const settings = getSettings();
   const systemPrompt = buildSystemPrompt(settings.profile);
 
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 512,
-    system: systemPrompt,
-    messages: [
-      { role: 'user', content: userMessage },
-    ],
-  });
-
-  // Extract the text body from the response
-  let body = '';
-  for (const block of response.content) {
-    if (block.type === 'text') {
-      body += block.text;
-    }
-  }
-  body = body.trim();
+  // Prose output (not JSON) through the shared free-first provider layer, so
+  // drafts work on Ollama/Hermes/Groq/Gemini too — not only paid Anthropic.
+  const body = (await complete(settings, systemPrompt, userMessage, { json: false, maxTokens: 512 })).trim();
 
   return {
     id: randomUUID(),

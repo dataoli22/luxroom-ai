@@ -423,11 +423,11 @@ ipcMain.handle('approvals:get-pending', async () => {
   return flat
 })
 
-ipcMain.handle('approvals:approve', async (_e, { listingUrl, draftId }) => {
-  const updated = await _db.updateDraft(listingUrl, draftId, {
-    approved: true,
-    approvedAt: new Date().toISOString(),
-  })
+ipcMain.handle('approvals:approve', async (_e, { listingUrl, draftId, body }) => {
+  const patch = { approved: true, approvedAt: new Date().toISOString() }
+  // If the user edited the draft in the Approvals tab, send the edited text.
+  if (typeof body === 'string' && body.trim()) patch.body = body.trim()
+  const updated = await _db.updateDraft(listingUrl, draftId, patch)
   const listing = await _db.getListing(listingUrl)
   if (!listing) throw new Error(`Listing not found: ${listingUrl}`)
   const draft = { ...(listing.messageDrafts ?? []).find(d => d.id === draftId), ...updated, approved: true }

@@ -79,18 +79,33 @@ function recencyBonus(timestamp) {
 }
 
 /**
- * Score based on monthly rent.
+ * Score based on monthly rent, relative to the user's budget when known.
+ * With a budget set, value is scored by rent/budget ratio so it works for any
+ * budget (room seeker at €700 or apartment seeker at €1500). Falls back to the
+ * old fixed Luxembourg room bands when no budget is available.
  * @param {string|number|null|undefined} rentTotal
+ * @param {number|null|undefined} maxBudget
  * @returns {number} 0 | 1 | 4 | 7 | 10
  */
-function priceScore(rentTotal) {
+function priceScore(rentTotal, maxBudget) {
   const rent = parseRent(rentTotal);
   if (rent === null) return 0;
+
+  if (Number.isFinite(maxBudget) && maxBudget > 0) {
+    const ratio = rent / maxBudget;
+    if (ratio <= 0.7) return 10;  // well under budget — great value
+    if (ratio <= 0.85) return 7;
+    if (ratio <= 1.0) return 4;   // right at budget
+    if (ratio <= 1.1) return 1;   // slightly over
+    return 0;                     // clearly over budget
+  }
+
+  // No budget known — fall back to fixed Luxembourg room bands.
   if (rent < 550) return 10;
   if (rent < 650) return 7;
   if (rent < 750) return 4;
   if (rent <= 800) return 1;
-  return 0; // > 800
+  return 0;
 }
 
 /**
@@ -143,7 +158,8 @@ export function scoreOpportunity(enrichedListing) {
     : 0;
 
   const rentField = enrichedListing.rentTotal ?? enrichedListing.rent ?? enrichedListing.price ?? null;
-  const pScore = priceScore(rentField);
+  const maxBudget = Number(enrichedListing.maxBudget);
+  const pScore = priceScore(rentField, Number.isFinite(maxBudget) ? maxBudget : null);
 
   const ts = enrichedListing.timestamp ?? enrichedListing.postedAt ?? enrichedListing.createdAt ?? null;
   const rBonus = recencyBonus(ts);

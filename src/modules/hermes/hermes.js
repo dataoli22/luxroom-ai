@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import { chromium } from 'playwright';
+import { getSettings } from '../../settings.js';
 
 const SUBJECT_MAP = {
   introduction: 'Room enquiry',
@@ -43,17 +44,20 @@ async function fillContactForm(url, draft) {
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // Fill name field
-    const nameSelectors = [
-      '[name*="name" i]',
-      '[id*="name" i]',
-      '[placeholder*="name" i]',
-    ];
-    for (const sel of nameSelectors) {
-      const el = page.locator(sel).first();
-      if (await el.count() > 0) {
-        await el.fill('Olipriya');
-        break;
+    // Fill name field — use the user's real name from their profile
+    const applicantName = getSettings().profile?.name?.trim() || '';
+    if (applicantName) {
+      const nameSelectors = [
+        '[name*="name" i]',
+        '[id*="name" i]',
+        '[placeholder*="name" i]',
+      ];
+      for (const sel of nameSelectors) {
+        const el = page.locator(sel).first();
+        if (await el.count() > 0) {
+          await el.fill(applicantName);
+          break;
+        }
       }
     }
 
@@ -200,6 +204,19 @@ export async function sendApprovedDraft(listing, draft) {
     .update(draft.body)
     .digest('hex')
     .slice(0, 16);
+
+  // Guard: a listing with no usable contact method can't be sent to. Fail
+  // gracefully with a clear reason instead of throwing a TypeError.
+  if (!listing.contactMethod || typeof listing.contactMethod !== 'string' || listing.contactMethod === 'unknown') {
+    return {
+      draftId: draft.id,
+      sentAt: new Date().toISOString(),
+      platform: 'unknown',
+      messageHash,
+      status: 'failed',
+      errorMessage: 'No contact method available for this listing — send it manually from the listing page.',
+    };
+  }
 
   let platform;
   if (listing.contactMethod.includes('@')) {

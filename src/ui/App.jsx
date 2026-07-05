@@ -102,7 +102,8 @@ export default function App() {
   const handleSetInterval = async (hours) => {
     setScanInterval(hours)
     setShowIntervalPicker(false)
-    await window.luxroom?.settings.save({ crawlIntervalHours: hours }).catch(() => {})
+    // Save the key the pipeline actually reads (with camelCase for back-compat).
+    await window.luxroom?.settings.save({ CRAWL_INTERVAL_HOURS: String(hours), crawlIntervalHours: hours }).catch(() => {})
   }
 
   useEffect(() => {

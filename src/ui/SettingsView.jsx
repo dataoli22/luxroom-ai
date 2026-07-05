@@ -91,6 +91,28 @@ const PROVIDERS = [
 ];
 const costColor = (cost) => cost.startsWith('Free') ? '#6ee7b7' : '#f0a868';
 
+// The UI uses camelCase field names, but the backend (notifier, pipeline,
+// extractor) reads these UPPERCASE env-style keys. Map between them on save/load
+// so edits in Settings actually take effect. (Provider keys like anthropicApiKey
+// already match what the analyser reads, so they're not in this map.)
+const KEY_MAP = {
+  ollamaUrl: 'OLLAMA_BASE_URL',
+  ollamaModel: 'OLLAMA_MODEL',
+  smtpHost: 'SMTP_HOST',
+  smtpPort: 'SMTP_PORT',
+  smtpUser: 'SMTP_USER',
+  smtpPassword: 'SMTP_PASS',
+  smtpFrom: 'SMTP_FROM',
+  notificationEmail: 'NOTIFICATION_EMAIL',
+  telegramBotToken: 'TELEGRAM_BOT_TOKEN',
+  telegramChatId: 'TELEGRAM_CHAT_ID',
+  crawlIntervalHours: 'CRAWL_INTERVAL_HOURS',
+  opportunityThreshold: 'OPPORTUNITY_THRESHOLD',
+  emailEnabled: 'ENABLE_EMAIL_NOTIFICATIONS',
+  telegramEnabled: 'ENABLE_TELEGRAM_NOTIFICATIONS',
+  desktopNotificationsEnabled: 'ENABLE_DESKTOP_NOTIFICATIONS',
+};
+
 function Field({ label, helper, children, fullWidth }) {
   return (
     <div style={fullWidth ? { gridColumn: '1 / -1' } : {}}>
@@ -136,7 +158,17 @@ export default function SettingsView({ onEditProfile }) {
 
   useEffect(() => {
     window.luxroom?.settings.get().then((saved) => {
-      if (saved) setForm((prev) => ({ ...prev, ...saved }));
+      if (!saved) return;
+      // Read the backend's UPPERCASE values back into the camelCase form fields.
+      const mapped = { ...saved };
+      for (const [camel, upper] of Object.entries(KEY_MAP)) {
+        if (saved[upper] !== undefined) {
+          mapped[camel] = camel === 'emailEnabled' || camel === 'telegramEnabled' || camel === 'desktopNotificationsEnabled'
+            ? saved[upper] === 'true' || saved[upper] === true
+            : saved[upper];
+        }
+      }
+      setForm((prev) => ({ ...prev, ...mapped }));
     }).catch(() => {});
   }, []);
 
@@ -151,7 +183,16 @@ export default function SettingsView({ onEditProfile }) {
 
   async function handleSave() {
     try {
-      await window.luxroom.settings.save(form);
+      // Translate camelCase UI fields → the UPPERCASE keys the backend reads.
+      const payload = { ...form };
+      for (const [camel, upper] of Object.entries(KEY_MAP)) {
+        if (form[camel] !== undefined) {
+          const v = form[camel];
+          payload[upper] = typeof v === 'boolean' ? String(v) : v;
+          delete payload[camel];
+        }
+      }
+      await window.luxroom.settings.save(payload);
       showToast('Settings saved', false);
     } catch (err) {
       showToast('Failed to save: ' + (err.message || err), true);

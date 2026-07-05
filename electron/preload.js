@@ -29,7 +29,7 @@ contextBridge.exposeInMainWorld('luxroom', {
 
   approvals: {
     getPending: () => ipcRenderer.invoke('approvals:get-pending'),
-    approve: (listingUrl, draftId) => ipcRenderer.invoke('approvals:approve', { listingUrl, draftId }),
+    approve: (listingUrl, draftId, body) => ipcRenderer.invoke('approvals:approve', { listingUrl, draftId, body }),
     discard: (listingUrl, draftId) => ipcRenderer.invoke('approvals:discard', { listingUrl, draftId }),
     generateDraft: (listingUrl, type) => ipcRenderer.invoke('approvals:generate-draft', { listingUrl, type }),
     onChange: (callback) => {

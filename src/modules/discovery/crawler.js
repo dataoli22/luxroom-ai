@@ -18,6 +18,7 @@
 import 'dotenv/config';
 import { chromium } from 'playwright';
 import crypto from 'crypto';
+import fs from 'fs';
 import fetch from 'node-fetch';
 import * as db from '../../db/database.js';
 import { getSettings } from '../../settings.js';
@@ -475,6 +476,9 @@ async function paginateAndExtract(page, sourceConfig, maxPages) {
 export const SOURCES = [
   // ── Already live ────────────────────────────────────────────────────────────
   {
+    // Login-gated: listings are only visible when signed in. The user connects
+    // once during onboarding (Playwright storageState reused by the crawler).
+    // If not connected, this source yields nothing and the cascade moves on.
     name: 'Appartager',
     searchUrls: [
       'https://www.appartager.lu/annonces/colocation/luxembourg/?region=nord',
@@ -482,11 +486,15 @@ export const SOURCES = [
     ],
     extractLinks: async (page) =>
       page.evaluate(() => {
-        const urls = Array.from(
-          document.querySelectorAll('a[href*="/annonces/colocation/"]')
-        )
+        const urls = Array.from(document.querySelectorAll('a[href]'))
           .map(a => a.href)
-          .filter(href => /\/annonces\/colocation\/.+\/.+/.test(href));
+          .filter(href =>
+            // listing detail pages: /annonces/colocation/<city>/<slug-or-id>
+            /appartager\.lu\/annonces\/colocation\/.+\/.+/.test(href) ||
+            // common Roomgo-network room detail shapes
+            /appartager\.lu\/(room|chambre|annonce|listing)\/.*\d/.test(href) ||
+            (/appartager\.lu\//.test(href) && /\/\d{5,}/.test(href))
+          );
         return [...new Set(urls)];
       }),
   },
@@ -886,12 +894,22 @@ export async function crawlSource(sourceConfig, browser) {
   await db.initDb();
 
   const newRecords = [];
-  const context    = await browser.newContext({
+  const contextOpts = {
     userAgent: USER_AGENT,
     viewport: { width: 1280, height: 900 },
     locale: 'fr-LU',
     timezoneId: 'Europe/Luxembourg',
-  });
+  };
+
+  // Login-gated sources (e.g. Appartager): reuse the session the user captured
+  // during onboarding so we crawl as the logged-in user.
+  const authFile = getSettings().SOURCE_AUTH?.[sourceConfig.name.toLowerCase()];
+  if (authFile && fs.existsSync(authFile)) {
+    contextOpts.storageState = authFile;
+    console.log(`[${sourceConfig.name}] Using saved login session`);
+  }
+
+  const context = await browser.newContext(contextOpts);
 
   const page = await context.newPage();
 

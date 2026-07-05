@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import SourceLogin from './SourceLogin.jsx'
 
 const c = {
   bg: '#0f0f13',
@@ -1021,6 +1022,23 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
               <p style={{ color: '#5a5a7a', fontSize: 12, margin: '5px 0 0', lineHeight: 1.5 }}>
                 Leave blank to run entirely on your own machine. Stored only on your device.
               </p>
+            </div>
+
+            {/* Connect Appartager — login-gated but high-value source */}
+            <div>
+              <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                Connect Appartager
+                <span style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+                  color: '#6ee7b7', background: '#0d2b1a', border: '1px solid #1a4a1a',
+                  borderRadius: 10, padding: '2px 8px', textTransform: 'none',
+                }}>Optional · Recommended</span>
+              </label>
+              <SourceLogin
+                source="appartager"
+                label="Appartager"
+                note="One of the best room sources in Luxembourg, but it only shows listings to members. Log in once now and LuxRoom AI will scan it for you. You can also do this later in Settings."
+              />
             </div>
 
             {/* AI status pill */}

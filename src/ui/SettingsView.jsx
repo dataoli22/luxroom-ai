@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import SourceLogin from './SourceLogin.jsx';
 
 const inputStyle = {
   background: '#0f0f13',
@@ -467,6 +468,16 @@ export default function SettingsView({ onEditProfile }) {
             </code>
           </div>
         </div>
+      </div>
+
+      {/* Section 2b — Connected Accounts */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>Connected Accounts</div>
+        <p style={{ color: '#7a7a9a', fontSize: 13, margin: '0 0 12px', lineHeight: 1.6 }}>
+          Some sites only show listings to logged-in members. Connect once and LuxRoom AI scans them
+          as you. If a source stops returning listings, your session may have expired — just reconnect.
+        </p>
+        <SourceLogin source="appartager" label="Appartager" />
       </div>
 
       {/* Section 3 — Notifications */}

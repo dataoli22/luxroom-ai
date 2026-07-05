@@ -27,6 +27,15 @@ contextBridge.exposeInMainWorld('luxroom', {
     },
   },
 
+  auth: {
+    sources: () => ipcRenderer.invoke('auth:sources'),
+    openLogin: (source) => ipcRenderer.invoke('auth:open-login', { source }),
+    saveLogin: (source) => ipcRenderer.invoke('auth:save-login', { source }),
+    cancelLogin: () => ipcRenderer.invoke('auth:cancel-login'),
+    clearLogin: (source) => ipcRenderer.invoke('auth:clear-login', { source }),
+    status: () => ipcRenderer.invoke('auth:status'),
+  },
+
   approvals: {
     getPending: () => ipcRenderer.invoke('approvals:get-pending'),
     approve: (listingUrl, draftId, body) => ipcRenderer.invoke('approvals:approve', { listingUrl, draftId, body }),

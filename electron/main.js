@@ -100,7 +100,7 @@ function buildTray() {
 }
 
 // ESM module refs — populated after app is ready
-let _settings, _pipeline, _db, _messaging, _hermes, _hardware
+let _settings, _pipeline, _db, _messaging, _hermes, _hardware, _auth
 
 async function loadModules() {
   const base = 'file:///' + __dirname.replace(/\\/g, '/') + '/../src/'
@@ -110,6 +110,11 @@ async function loadModules() {
   _messaging = await import(base + 'modules/messaging/messenger.js')
   _hermes    = await import(base + 'modules/hermes/hermes.js')
   _hardware  = await import(base + 'hardware.js')
+  _auth      = await import(base + 'modules/auth/login.js')
+}
+
+function authDir() {
+  return path.join(app.getPath('userData'), 'auth')
 }
 
 function createWindow() {
@@ -508,6 +513,47 @@ ipcMain.handle('listings:open-url', (_e, url) => {
   try { parsed = new URL(url) } catch { return }
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return
   return shell.openExternal(url)
+})
+
+// ─── Source login (one-time session capture for login-gated sources) ─────────
+
+ipcMain.handle('auth:sources', async () => _auth.LOGIN_SOURCES)
+
+ipcMain.handle('auth:open-login', async (_e, { source }) => _auth.openLogin(source))
+
+ipcMain.handle('auth:save-login', async (_e, { source }) => {
+  const res = await _auth.saveLogin(source, authDir())
+  if (res.ok) {
+    // Record the session file path so the crawler can find it.
+    const s = _settings.getSettings()
+    const sourceAuth = { ...(s.SOURCE_AUTH || {}), [source]: res.file }
+    _settings.saveSettings({ SOURCE_AUTH: sourceAuth })
+    _settings.applyToEnv(_settings.getSettings())
+  }
+  return res
+})
+
+ipcMain.handle('auth:cancel-login', async () => _auth.cancelLogin())
+
+ipcMain.handle('auth:clear-login', async (_e, { source }) => {
+  const res = _auth.clearLogin(source, authDir())
+  const s = _settings.getSettings()
+  const sourceAuth = { ...(s.SOURCE_AUTH || {}) }
+  delete sourceAuth[source]
+  _settings.saveSettings({ SOURCE_AUTH: sourceAuth })
+  _settings.applyToEnv(_settings.getSettings())
+  return res
+})
+
+// Which sources have a saved (and still-present) session file.
+ipcMain.handle('auth:status', async () => {
+  const s = _settings.getSettings()
+  const sourceAuth = s.SOURCE_AUTH || {}
+  const out = {}
+  for (const [key, file] of Object.entries(sourceAuth)) {
+    out[key] = typeof file === 'string' && fs.existsSync(file)
+  }
+  return out
 })
 
 // ─── Ollama setup & model management ─────────────────────────────────────────

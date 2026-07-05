@@ -34,31 +34,6 @@ jobs:
           files: release/*.exe
           tag_name: ${{ github.ref_name }}
 
-  build-mac-arm64:
-    name: macOS Apple Silicon (zip)
-    # GitHub-hosted Apple Silicon runner — free for public repos. No physical Mac
-    # or self-hosted runner needed. Produces an unsigned .zip (Apple Silicon).
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build macOS arm64 zip
-        run: npm run build:mac -- --arm64
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Skip code-signing on the hosted runner (no certificate).
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-
-      - name: Upload macOS arm64 zip
-        uses: softprops/action-gh-release@v2
-        with:
-          files: release/*.zip
-          tag_name: ${{ github.ref_name }}
+  # macOS is NOT built in CI. Mac users build the app on their own device from
+  # source (a one-time `npm run build:mac`) — see the README. This keeps the
+  # release pipeline Windows-only and avoids any Mac runner dependency.

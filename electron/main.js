@@ -127,6 +127,7 @@ function showWindow() {
 }
 
 function buildTray() {
+  if (tray) return // only ever one tray icon
   tray = new Tray(createTrayIcon())
   tray.setToolTip('LuxRoom AI — housing scanner')
   const menu = Menu.buildFromTemplate([
@@ -310,7 +311,17 @@ async function startApprovalServer() {
 
 // ─── App lifecycle ─────────────────────────────────────────────────────────
 
+// Single-instance lock — prevents a second launch from spawning another process
+// (and therefore another tray icon). The second launch just focuses the window.
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => { showWindow() })
+}
+
 app.whenReady().then(async () => {
+  if (!gotTheLock) return
   buildAppMenu()
   // Set userData path so settings.js can locate its config file
   process.env.ELECTRON_USER_DATA = app.getPath('userData')

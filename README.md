@@ -24,12 +24,12 @@ You set it up once. It runs in the background. You only look at the listings wor
 
 Pick your file:
 
-| Your computer | File to download |
+| Your computer | How to get it |
 |---|---|
-| 🪟 Windows (any modern PC) | `LuxRoom-AI-Windows.exe` |
-| 🍎 Mac (M1/M2/M3/M4 — Apple Silicon) | `LuxRoom-AI-Mac-AppleSilicon.zip` |
+| 🪟 Windows (any modern PC) | Download `LuxRoom-AI-Windows.exe` from [Releases](../../releases/latest) |
+| 🍎 Mac (Apple Silicon or Intel) | Build the app once on your Mac — see [macOS](#macos) below |
 
-> **Intel Mac?** Not currently supported as a pre-built download. You can [build from source](#building-from-source) on any Mac.
+> **Why no pre-built Mac download?** A pre-built Mac app must be signed with a paid Apple Developer certificate to run smoothly. Instead, Mac users build the app locally in one command (below) — it produces a `.zip` of the app on your own device. It only takes a couple of minutes, once.
 
 ---
 
@@ -52,24 +52,33 @@ Pick your file:
 
 ### macOS
 
-1. Download the `.zip` from the [Releases](../../releases/latest) page
-2. Double-click the `.zip` to unzip it — you'll get **LuxRoom AI.app**
-3. Drag **LuxRoom AI.app** into your **Applications** folder
-4. **Right-click (or Control-click) the app → Open → Open** (do this the first time — a normal double-click is blocked for unsigned apps)
-5. Fill in the 3-field setup (name, email, app password) — done in under 2 minutes
-6. The app automatically downloads and installs Ollama in the background — takes 2–5 minutes the first time, then instant on every launch after
+You build the app once on your own Mac. You need [Node.js 20+](https://nodejs.org) installed (one-time).
+
+1. Download the source: on the repo page click **Code → Download ZIP**, then unzip it (or `git clone` it)
+2. Open **Terminal**, go into the folder, and run:
+   ```bash
+   npm install
+   npm run build:mac
+   ```
+3. This creates **LuxRoom AI.app** inside the `release/` folder (also zipped as `LuxRoom-AI-Mac-AppleSilicon.zip`)
+4. Drag **LuxRoom AI.app** into your **Applications** folder
+5. **Right-click (or Control-click) the app → Open → Open** the first time (a normal double-click is blocked for unsigned apps)
+6. Fill in the 3-field setup (name, email, app password), and the app installs Ollama + a model in the background
+
+> **Prefer not to build? Just run it from source:**
+> ```bash
+> npm install
+> npm run dev
+> ```
+> This launches the app directly — no packaging needed.
 
 > **macOS security warning — "damaged" or "unidentified developer"**
 >
-> macOS blocks apps that aren't signed with an Apple Developer certificate ($99/year). As a free open-source app, LuxRoom AI is not enrolled in Apple's programme. It is **not** malicious — the full source code is in this repository.
->
-> The **right-click → Open** step above avoids this for most people. If you still see **"LuxRoom AI is damaged and can't be opened"**, open Terminal and run:
+> Because the app isn't signed with a paid Apple certificate, the **right-click → Open** step above is needed the first time. If you ever see **"LuxRoom AI is damaged and can't be opened"**, run:
 > ```bash
 > xattr -cr "/Applications/LuxRoom AI.app"
 > ```
-> Then open the app again — it will work.
->
-> If neither works: **System Settings → Privacy & Security** → scroll to Security → click **Open Anyway**.
+> then open it again. Or: **System Settings → Privacy & Security → Open Anyway**.
 >
 > If neither works: go to **System Settings → Privacy & Security** → scroll to Security → click **Open Anyway**.
 

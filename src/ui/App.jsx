@@ -38,6 +38,7 @@ export default function App() {
   const [onboardingDone, setOnboardingDone] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showModels, setShowModels] = useState(false)
+  const [showFirstRun, setShowFirstRun] = useState(false)
 
   // Keyboard shortcuts: 1-5 switch tabs, Ctrl/Cmd+R = Run Now
   useEffect(() => {
@@ -79,11 +80,20 @@ export default function App() {
       setShowOnboarding(!done)
       const h = Number(s?.crawlIntervalHours || s?.CRAWL_INTERVAL_HOURS || 6)
       if (h) setScanInterval(h)
+      // Show the one-time "how scanning works" prompt to onboarded users who
+      // haven't seen it yet.
+      if (done && !s?.firstRunPromptShown) setShowFirstRun(true)
     }).catch(() => {
       setOnboardingDone(false)
       setShowOnboarding(true)
     })
   }, [])
+
+  const dismissFirstRun = async (runNow) => {
+    setShowFirstRun(false)
+    try { await window.luxroom?.settings.save({ firstRunPromptShown: true }) } catch {}
+    if (runNow) handleRunNow()
+  }
 
   function formatCountdown(ms) {
     const s = Math.max(0, Math.floor(ms / 1000))
@@ -137,11 +147,13 @@ export default function App() {
   const handleOnboardingComplete = async (profile) => {
     setOnboardingDone(true)
     setShowOnboarding(false)
-    // Auto-start the pipeline immediately after setup
+    // Auto-start the pipeline (schedules the background cron) immediately after setup
     try {
       const s = await window.luxroom?.pipeline.start()
       if (s) setStatus(s)
     } catch {}
+    // Explain the one-time first scan.
+    setShowFirstRun(true)
   }
 
   const handleEditProfile = () => {
@@ -255,6 +267,51 @@ export default function App() {
 
       {/* Model manager overlay */}
       {showModels && <ModelManagerView onClose={() => setShowModels(false)} />}
+
+      {/* One-time "how scanning works" prompt */}
+      {showFirstRun && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 20,
+        }}>
+          <div style={{
+            background: c.panel, border: `1px solid ${c.border}`, borderRadius: 16,
+            maxWidth: 460, width: '100%', padding: '28px 30px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{ fontSize: 30, marginBottom: 12 }}>🔎</div>
+            <h2 style={{ margin: '0 0 10px', fontSize: 20, fontWeight: 700, color: c.text }}>
+              Start your first scan
+            </h2>
+            <p style={{ margin: '0 0 14px', fontSize: 14, lineHeight: 1.6, color: '#b8b8c8' }}>
+              Run the first scan now to see listings right away. This is a <strong style={{ color: '#c4b5fd' }}>one-time</strong> manual start.
+            </p>
+            <div style={{
+              background: '#0d1a0d', border: '1px solid #1a4a1a', borderLeft: '3px solid #4ade80',
+              borderRadius: 8, padding: '12px 14px', fontSize: 13, lineHeight: 1.65, color: '#6ee7b7', marginBottom: 20,
+            }}>
+              After this, LuxRoom AI scans <strong style={{ color: '#a7f3d0' }}>automatically every {scanInterval} hour{scanInterval !== 1 ? 's' : ''}</strong> in the
+              background — even when this window is closed — as long as your laptop is on. You'll get a
+              desktop notification the moment a match appears. You can change the frequency, or click
+              <strong style={{ color: '#a7f3d0' }}> Run Now</strong> for a manual scan, any time.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => dismissFirstRun(true)} style={{
+                flex: 1, padding: '12px', borderRadius: 8, border: 'none',
+                background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', color: '#fff',
+                fontSize: 15, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 16px rgba(124,58,237,0.35)',
+              }}>
+                ▶ Run my first scan
+              </button>
+              <button onClick={() => dismissFirstRun(false)} style={{
+                padding: '12px 18px', borderRadius: 8, border: `1px solid ${c.border}`,
+                background: 'transparent', color: c.sub, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              }}>
+                Not now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Status bar */}
       <div style={{

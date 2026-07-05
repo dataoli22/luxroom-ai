@@ -6,6 +6,7 @@ const c = {
 }
 
 const POPULAR_MODELS = [
+  { name: 'hermes3',        size: '4.7 GB', note: 'Recommended for analysis — clean JSON output' },
   { name: 'llama3.2:1b',    size: '1.3 GB', note: 'Fastest — good for 8 GB RAM laptops' },
   { name: 'llama3.2:3b',    size: '2.0 GB', note: 'Best quality/speed balance for most users' },
   { name: 'llama3.1:8b',    size: '4.7 GB', note: 'High quality — needs 16 GB RAM' },

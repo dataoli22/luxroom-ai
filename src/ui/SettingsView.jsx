@@ -156,6 +156,63 @@ export default function SettingsView({ onEditProfile }) {
   const [toast, setToast] = useState(null);
   const [emailTestResult, setEmailTestResult] = useState(null);
   const [emailTesting, setEmailTesting] = useState(false);
+  const [pull, setPull] = useState(null); // { model, pct, msg, error, done }
+
+  async function downloadModel(name) {
+    if (!name || !name.trim()) return;
+    const model = name.trim();
+    setPull({ model, pct: null, msg: 'Starting…', error: false, done: false });
+    const unsub = window.luxroom?.setup?.onProgress(({ phase, message, pct, error }) => {
+      if (phase !== 'pull') return;
+      setPull(p => ({ ...(p || {}), model, msg: message, pct: pct ?? p?.pct, error: !!error }));
+    });
+    try {
+      await window.luxroom?.setup?.pullModel(model);
+      setPull({ model, pct: 100, msg: `${model} is ready ✓`, error: false, done: true });
+    } catch (e) {
+      setPull({ model, pct: null, msg: e?.message || 'Download failed', error: true, done: false });
+    } finally {
+      unsub?.();
+    }
+  }
+
+  function renderPull(name, sizeHint) {
+    const active = pull && pull.model === name;
+    const busy = active && !pull.done && !pull.error;
+    return (
+      <div style={{ gridColumn: '1 / -1' }}>
+        <button
+          onClick={() => downloadModel(name)}
+          disabled={busy}
+          style={{
+            background: busy ? '#2a2a4a' : 'linear-gradient(135deg, #7c3aed, #5b21b6)',
+            border: 'none', color: '#fff', padding: '10px 18px', borderRadius: 8,
+            fontSize: 14, fontWeight: 700, cursor: busy ? 'default' : 'pointer',
+          }}
+        >
+          {busy ? 'Downloading…' : `⬇ Download ${name} now — no terminal needed`}
+        </button>
+        <span style={{ color: '#5a5a7a', fontSize: 12, marginLeft: 12 }}>{sizeHint}</span>
+        {active && (
+          <div style={{ marginTop: 10 }}>
+            {pull.pct != null && !pull.done && (
+              <div style={{ height: 5, background: '#1a1a2a', borderRadius: 3, overflow: 'hidden', marginBottom: 6 }}>
+                <div style={{ height: '100%', background: '#7c5cbf', width: `${pull.pct}%`, transition: 'width 0.4s' }} />
+              </div>
+            )}
+            <div style={{ fontSize: 12, fontFamily: 'monospace', color: pull.error ? '#f87171' : pull.done ? '#4ade80' : '#9090b8' }}>
+              {pull.msg}
+            </div>
+            {pull.error && (
+              <div style={{ fontSize: 12, color: '#a89060', marginTop: 4 }}>
+                Make sure Ollama is installed and running, then try again.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   useEffect(() => {
     window.luxroom?.settings.get().then((saved) => {
@@ -380,11 +437,12 @@ export default function SettingsView({ onEditProfile }) {
         {form.aiProvider === 'ollama' && (
           <div style={gridStyle}>
             <div style={{ gridColumn: '1 / -1', background: '#0d1a0d', border: '1px solid #1a4a1a', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#6ee7b7' }}>
-              ✓ Free — Ollama runs entirely on your device, no API key needed. Set the model in the Local Extraction section below.
+              ✓ Free — Ollama runs entirely on your device, no API key needed. Download your model below — no terminal needed.
             </div>
+            {renderPull(form.ollamaModel || 'qwen2.5', 'one-time download')}
             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
               <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com')}
-                style={linkBtnStyle}>Download Ollama → ollama.com</button>
+                style={linkBtnStyle}>Install Ollama → ollama.com</button>
               <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com/library')}
                 style={linkBtnStyle}>Browse models →</button>
             </div>
@@ -395,17 +453,18 @@ export default function SettingsView({ onEditProfile }) {
         {form.aiProvider === 'hermes' && (
           <div style={gridStyle}>
             <div style={{ gridColumn: '1 / -1', background: '#0d1a0d', border: '1px solid #1a4a1a', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#6ee7b7' }}>
-              ✓ Free — Hermes runs locally through Ollama and is tuned for clean JSON output, so it's a great analysis model. Pull it first, then it costs nothing to run.
+              ✓ Free — Hermes runs locally through Ollama and is tuned for clean JSON output, so it's a great analysis model. Download it once with the button below — no terminal needed.
             </div>
-            <Field label="Hermes Model" helper="Runs via Ollama. Pull with:  ollama pull hermes3">
+            <Field label="Hermes Model" helper="Runs via Ollama, entirely on your device.">
               <input type="text" style={inputStyle} value={form.hermesModel || 'hermes3'}
                 onChange={(e) => set('hermesModel', e.target.value)} placeholder="hermes3" />
             </Field>
+            {renderPull(form.hermesModel || 'hermes3', '≈ 4.7 GB · one-time, a few minutes')}
             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
               <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com/library/hermes3')}
-                style={linkBtnStyle}>Get Hermes → ollama.com/library/hermes3</button>
+                style={linkBtnStyle}>About Hermes → ollama.com/library/hermes3</button>
               <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com')}
-                style={linkBtnStyle}>Download Ollama →</button>
+                style={linkBtnStyle}>Install Ollama →</button>
             </div>
           </div>
         )}

@@ -65,6 +65,69 @@ function humanSize(bytes) {
   return gb >= 1 ? `${gb.toFixed(1)} GB` : `${Math.round(b / 1e6)} MB`
 }
 
+// Talk to Ollama using Node's built-in http/https — NOT global fetch, which is
+// not reliably present in Electron's packaged main process. This is why in-app
+// model downloads previously did nothing.
+function ollamaRequest(method, pathname, body, { timeout = 10000 } = {}) {
+  return new Promise((resolve, reject) => {
+    let base
+    try { base = new URL(ollamaBase()) } catch { return reject(new Error('Bad Ollama URL')) }
+    const lib = base.protocol === 'https:' ? https : http
+    const payload = body ? JSON.stringify(body) : null
+    const headers = ollamaHeaders()
+    if (payload) headers['Content-Length'] = Buffer.byteLength(payload)
+    const req = lib.request({
+      hostname: base.hostname,
+      port: base.port || (base.protocol === 'https:' ? 443 : 80),
+      path: pathname, method, headers, timeout,
+    }, (res) => {
+      let data = ''
+      res.on('data', c => { data += c })
+      res.on('end', () => resolve({ status: res.statusCode, body: data }))
+    })
+    req.on('error', reject)
+    req.on('timeout', () => req.destroy(new Error('Ollama request timed out')))
+    if (payload) req.write(payload)
+    req.end()
+  })
+}
+
+// Streamed model pull — invokes onLine(jsonLine) for each NDJSON progress line.
+function ollamaPullStream(model, onLine) {
+  return new Promise((resolve, reject) => {
+    let base
+    try { base = new URL(ollamaBase()) } catch { return reject(new Error('Bad Ollama URL')) }
+    const lib = base.protocol === 'https:' ? https : http
+    const payload = JSON.stringify({ name: model, stream: true })
+    const headers = ollamaHeaders()
+    headers['Content-Length'] = Buffer.byteLength(payload)
+    const req = lib.request({
+      hostname: base.hostname,
+      port: base.port || (base.protocol === 'https:' ? 443 : 80),
+      path: '/api/pull', method: 'POST', headers,
+    }, (res) => {
+      if (res.statusCode !== 200) {
+        let err = ''
+        res.on('data', c => { err += c })
+        res.on('end', () => reject(new Error(`Ollama pull failed (${res.statusCode}): ${err.slice(0, 200)}`)))
+        return
+      }
+      let buffer = ''
+      res.on('data', chunk => {
+        buffer += chunk.toString()
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) { if (line.trim()) onLine(line) }
+      })
+      res.on('end', () => { if (buffer.trim()) onLine(buffer); resolve() })
+      res.on('error', reject)
+    })
+    req.on('error', reject)
+    req.write(payload)
+    req.end()
+  })
+}
+
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
 let mainWindow = null
@@ -629,12 +692,15 @@ function pushSetupProgress(phase, message, pct, error = false) {
 ipcMain.handle('setup:check-ollama', async () => {
   // Prefer the running server — the most reliable "is Ollama usable" signal.
   try {
-    const r = await fetch(`${ollamaBase()}/api/version`, { signal: AbortSignal.timeout(3000) })
-    if (r.ok) { const d = await r.json().catch(() => ({})); return { installed: true, running: true, version: d.version || 'running' } }
+    const r = await ollamaRequest('GET', '/api/version', null, { timeout: 3000 })
+    if (r.status === 200) {
+      let version = 'running'
+      try { version = JSON.parse(r.body).version || 'running' } catch {}
+      return { installed: true, running: true, version }
+    }
   } catch { /* server not up — try the binary next */ }
   try {
     const { stdout } = await execFileAsync(resolveOllama(), ['--version'])
-    // Binary exists but server may be down — still "installed".
     return { installed: true, running: false, version: stdout.trim() }
   } catch {
     return { installed: false, running: false }
@@ -762,22 +828,22 @@ ipcMain.handle('setup:install-ollama', async () => {
 })
 
 // Ensure the Ollama server is reachable; if not, try to start it via the binary.
-async function ensureOllamaServer() {
+async function isOllamaUp() {
   try {
-    const r = await fetch(`${ollamaBase()}/api/version`, { signal: AbortSignal.timeout(2500) })
-    if (r.ok) return true
-  } catch { /* not up yet */ }
+    const r = await ollamaRequest('GET', '/api/version', null, { timeout: 2500 })
+    return r.status === 200
+  } catch { return false }
+}
+
+async function ensureOllamaServer() {
+  if (await isOllamaUp()) return true
   // Try to start the server in the background, then wait for it.
   try {
-    const bin = resolveOllama()
-    spawn(bin, ['serve'], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+    spawn(resolveOllama(), ['serve'], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
   } catch { /* binary not found — nothing we can do */ }
   for (let i = 0; i < 10; i++) {
     await sleep(1500)
-    try {
-      const r = await fetch(`${ollamaBase()}/api/version`, { signal: AbortSignal.timeout(2500) })
-      if (r.ok) return true
-    } catch { /* keep waiting */ }
+    if (await isOllamaUp()) return true
   }
   return false
 }
@@ -795,57 +861,29 @@ ipcMain.handle('setup:pull-model', async (_e, model) => {
     throw new Error(msg)
   }
 
-  // Pull via the HTTP API and stream NDJSON progress — no CLI/binary path needed.
-  let res
-  try {
-    res = await fetch(`${ollamaBase()}/api/pull`, {
-      method: 'POST',
-      headers: ollamaHeaders(),
-      body: JSON.stringify({ name: model, stream: true }),
-    })
-  } catch (err) {
-    const msg = `Could not reach Ollama: ${err.message}`
-    pushSetupProgress('pull', msg, null, true)
-    throw new Error(msg)
-  }
-  if (!res.ok || !res.body) {
-    const body = await res.text().catch(() => '')
-    const msg = `Ollama pull failed (${res.status}): ${body.slice(0, 200)}`
-    pushSetupProgress('pull', msg, null, true)
-    throw new Error(msg)
-  }
+  // Pull via the HTTP API (Node http/https) and stream NDJSON progress.
+  let pullError = null
+  await ollamaPullStream(model, (line) => {
+    let obj
+    try { obj = JSON.parse(line) } catch { return }
+    if (obj.error) { pullError = obj.error; pushSetupProgress('pull', obj.error, null, true); return }
+    const pct = (obj.total && obj.completed) ? Math.round((obj.completed / obj.total) * 100) : null
+    pushSetupProgress('pull', obj.status || 'Downloading…', pct)
+  }).catch(err => { pullError = err.message })
 
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
-    for (const line of lines) {
-      if (!line.trim()) continue
-      let obj
-      try { obj = JSON.parse(line) } catch { continue }
-      if (obj.error) {
-        pushSetupProgress('pull', obj.error, null, true)
-        throw new Error(obj.error)
-      }
-      const pct = (obj.total && obj.completed) ? Math.round((obj.completed / obj.total) * 100) : null
-      pushSetupProgress('pull', obj.status || 'Downloading…', pct)
-    }
+  if (pullError) {
+    pushSetupProgress('pull', pullError, null, true)
+    throw new Error(pullError)
   }
-
   pushSetupProgress('pull', `${model} ready ✓`, 100)
   return { ok: true }
 })
 
 ipcMain.handle('setup:list-models', async () => {
   try {
-    const r = await fetch(`${ollamaBase()}/api/tags`, { headers: ollamaHeaders(), signal: AbortSignal.timeout(5000) })
-    if (!r.ok) return []
-    const d = await r.json()
+    const r = await ollamaRequest('GET', '/api/tags', null, { timeout: 5000 })
+    if (r.status !== 200) return []
+    const d = JSON.parse(r.body)
     return (d.models ?? []).map(m => ({
       name: m.name ?? m.model ?? '',
       size: humanSize(m.size),
@@ -861,12 +899,8 @@ ipcMain.handle('setup:remove-model', async (_e, model) => {
     return { ok: false, error: 'Invalid model name' }
   }
   try {
-    const r = await fetch(`${ollamaBase()}/api/delete`, {
-      method: 'DELETE',
-      headers: ollamaHeaders(),
-      body: JSON.stringify({ name: model }),
-    })
-    return r.ok ? { ok: true } : { ok: false, error: `status ${r.status}` }
+    const r = await ollamaRequest('DELETE', '/api/delete', { name: model })
+    return r.status === 200 ? { ok: true } : { ok: false, error: `status ${r.status}` }
   } catch (err) {
     return { ok: false, error: err.message }
   }

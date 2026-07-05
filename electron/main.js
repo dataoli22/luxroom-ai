@@ -20,11 +20,31 @@ const http     = require('http')
 const https    = require('https')
 const fs       = require('fs')
 const os       = require('os')
-const { spawn, exec } = require('child_process')
+const { spawn, exec, execFile } = require('child_process')
 const { promisify } = require('util')
 const nodemailer = require('nodemailer')
 
 const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
+
+// Resolve the ollama binary by full path. A freshly-installed Ollama is not on
+// the PATH of the already-running Electron process, so `spawn('ollama')` throws
+// ENOENT — we look in the known install locations first.
+function resolveOllama() {
+  const candidates = []
+  if (process.platform === 'win32') {
+    if (process.env.LOCALAPPDATA) candidates.push(path.join(process.env.LOCALAPPDATA, 'Programs', 'Ollama', 'ollama.exe'))
+    if (process.env.ProgramFiles) candidates.push(path.join(process.env.ProgramFiles, 'Ollama', 'ollama.exe'))
+  } else if (process.platform === 'darwin') {
+    candidates.push('/usr/local/bin/ollama', '/opt/homebrew/bin/ollama', '/Applications/Ollama.app/Contents/Resources/ollama')
+  } else {
+    candidates.push('/usr/local/bin/ollama', '/usr/bin/ollama')
+  }
+  for (const c of candidates) { try { if (fs.existsSync(c)) return c } catch {} }
+  return 'ollama' // fall back to PATH
+}
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
@@ -457,16 +477,28 @@ ipcMain.handle('approvals:generate-draft', async (_e, { listingUrl, type }) => {
   return saved
 })
 
-ipcMain.handle('email:test', async (_e, { to }) => {
+ipcMain.handle('email:test', async (_e, { to, config }) => {
   const s = _settings.getSettings()
+  // Prefer the config passed from the current form/onboarding (which may not be
+  // saved yet); fall back to persisted settings.
+  const host = (config?.host || s.SMTP_HOST || '').trim()
+  const port = Number(config?.port ?? s.SMTP_PORT ?? 587)
+  const user = (config?.user || s.SMTP_USER || to || '').trim()
+  // Gmail shows the 16-char App Password in 4 space-separated groups; users
+  // paste it with spaces. Strip all whitespace so auth doesn't fail.
+  const pass = String(config?.pass ?? s.SMTP_PASS ?? '').replace(/\s+/g, '')
+  const from = (config?.from || s.SMTP_FROM || user || '').trim()
+  const secure = config?.secure != null ? !!config.secure : (s.SMTP_SECURE === 'true')
+  const recipient = (to || user || '').trim()
+
+  if (!host || !user || !pass) {
+    return { ok: false, error: 'Missing email settings — enter your email and app password first.' }
+  }
   try {
-    const t = nodemailer.createTransport({
-      host: s.SMTP_HOST, port: Number(s.SMTP_PORT ?? 587),
-      secure: s.SMTP_SECURE === 'true',
-      auth: { user: s.SMTP_USER, pass: s.SMTP_PASS },
-    })
+    const t = nodemailer.createTransport({ host, port, secure, auth: { user, pass } })
     await t.sendMail({
-      from: s.SMTP_FROM, to,
+      from: from || user,
+      to: recipient,
       subject: 'LuxRoom AI — Test Email',
       text: 'This is a test email from LuxRoom AI. Your email configuration is working correctly.',
     })
@@ -566,7 +598,7 @@ function pushSetupProgress(phase, message, pct, error = false) {
 
 ipcMain.handle('setup:check-ollama', async () => {
   try {
-    const { stdout } = await execAsync('ollama --version')
+    const { stdout } = await execFileAsync(resolveOllama(), ['--version'])
     return { installed: true, version: stdout.trim() }
   } catch {
     return { installed: false }
@@ -634,48 +666,63 @@ ipcMain.handle('setup:install-ollama', async () => {
   const tmpPath = path.join(tmpDir, 'OllamaSetup.exe')
   pushSetupProgress('install', 'Downloading Ollama installer…', 5)
 
+  // Download, resolving on the file stream's 'finish' so the .exe is fully
+  // flushed to disk before we try to run it (a truncated exe causes spawn UNKNOWN).
   await new Promise((resolve, reject) => {
     const file = fs.createWriteStream(tmpPath)
-    const req = https.get('https://ollama.com/download/OllamaSetup.exe', (res) => {
-      if (res.statusCode === 302 || res.statusCode === 301) {
-        https.get(res.headers.location, (res2) => {
-          const total = parseInt(res2.headers['content-length'] ?? '0', 10)
-          let received = 0
-          res2.on('data', chunk => {
-            received += chunk.length
-            const pct = total > 0 ? Math.round(5 + (received / total) * 55) : 30
-            pushSetupProgress('install', `Downloading… ${Math.round(received / 1024 / 1024)} MB`, pct)
-            file.write(chunk)
-          })
-          res2.on('end', () => { file.end(); resolve() })
-          res2.on('error', reject)
-        }).on('error', reject)
-        return
-      }
+    file.on('error', reject)
+    file.on('finish', resolve)
+    const pipeFrom = (res) => {
       const total = parseInt(res.headers['content-length'] ?? '0', 10)
       let received = 0
       res.on('data', chunk => {
         received += chunk.length
         const pct = total > 0 ? Math.round(5 + (received / total) * 55) : 30
         pushSetupProgress('install', `Downloading… ${Math.round(received / 1024 / 1024)} MB`, pct)
-        file.write(chunk)
       })
-      res.on('end', () => { file.end(); resolve() })
       res.on('error', reject)
-    })
-    req.on('error', reject)
+      res.pipe(file)
+    }
+    const follow = (url) => https.get(url, (res) => {
+      if (res.statusCode === 301 || res.statusCode === 302) { res.resume(); return follow(res.headers.location) }
+      pipeFrom(res)
+    }).on('error', reject)
+    follow('https://ollama.com/download/OllamaSetup.exe')
   })
 
-  pushSetupProgress('install', 'Running installer… (takes ~30 seconds)', 65)
+  // Try a silent install first. If that fails (spawn UNKNOWN, elevation blocked,
+  // mark-of-the-web), fall back to launching the installer through the OS so the
+  // user can click through it — reliable where direct spawn is not.
+  pushSetupProgress('install', 'Running the Ollama installer…', 65)
+  let silentOk = false
   try {
-    const { execFile } = require('child_process')
-    const { promisify } = require('util')
-    await promisify(execFile)(tmpPath, ['/S'])
-  } finally {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
+    await new Promise((resolve, reject) => {
+      const child = spawn(tmpPath, ['/S'], { windowsHide: true })
+      child.on('error', reject)
+      child.on('exit', code => code === 0 ? resolve() : reject(new Error(`installer exit ${code}`)))
+    })
+    silentOk = true
+  } catch (err) {
+    console.warn('[setup] silent Ollama install failed, opening installer via OS:', err.message)
+    const openErr = await shell.openPath(tmpPath)
+    if (openErr) {
+      shell.openExternal('https://ollama.com/download/windows')
+      pushSetupProgress('install', 'Opened the Ollama download page — install it, then continue.', 85, true)
+    } else {
+      pushSetupProgress('install', 'Complete the Ollama installer window that just opened…', 70)
+    }
   }
+
+  // Wait (up to 5 min) for the ollama binary to appear, whether silent or
+  // interactive, so the model-download step can find it right away.
+  const deadline = Date.now() + 5 * 60 * 1000
+  while (Date.now() < deadline) {
+    if (resolveOllama() !== 'ollama') break
+    await sleep(3000)
+  }
+  // Leave the installer in the OS temp dir (may still be running); the OS cleans it.
   pushSetupProgress('install', 'Ollama installed ✓', 100)
-  return { ok: true }
+  return { ok: true, silent: silentOk }
 })
 
 ipcMain.handle('setup:pull-model', async (_e, model) => {
@@ -684,7 +731,7 @@ ipcMain.handle('setup:pull-model', async (_e, model) => {
   }
   pushSetupProgress('pull', `Starting download of ${model}…`, 0)
   return new Promise((resolve, reject) => {
-    const child = spawn('ollama', ['pull', model], { shell: false })
+    const child = spawn(resolveOllama(), ['pull', model], { shell: false })
     child.stdout.on('data', data => {
       for (const line of data.toString().split('\n').filter(Boolean)) {
         const m = line.match(/(\d+)%/)
@@ -705,15 +752,18 @@ ipcMain.handle('setup:pull-model', async (_e, model) => {
       }
     })
     child.on('error', err => {
-      pushSetupProgress('pull', `Could not start ollama: ${err.message}`, null, true)
-      reject(err)
+      const hint = err.code === 'ENOENT'
+        ? 'Ollama is not installed yet. Install it first, then try again.'
+        : err.message
+      pushSetupProgress('pull', `Could not start Ollama: ${hint}`, null, true)
+      reject(new Error(hint))
     })
   })
 })
 
 ipcMain.handle('setup:list-models', async () => {
   try {
-    const { stdout } = await execAsync('ollama list')
+    const { stdout } = await execFileAsync(resolveOllama(), ['list'])
     return stdout.trim().split('\n').slice(1)
       .filter(l => l.trim())
       .map(l => {
@@ -731,7 +781,7 @@ ipcMain.handle('setup:remove-model', async (_e, model) => {
     return { ok: false, error: 'Invalid model name' }
   }
   return new Promise(resolve => {
-    const child = spawn('ollama', ['rm', model], { shell: false })
+    const child = spawn(resolveOllama(), ['rm', model], { shell: false })
     child.on('close', code =>
       code === 0 ? resolve({ ok: true }) : resolve({ ok: false, error: `exit ${code}` })
     )

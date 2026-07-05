@@ -49,7 +49,7 @@ contextBridge.exposeInMainWorld('luxroom', {
   },
 
   email: {
-    test: (to) => ipcRenderer.invoke('email:test', { to }),
+    test: (to, config) => ipcRenderer.invoke('email:test', { to, config }),
   },
 
   logs: {

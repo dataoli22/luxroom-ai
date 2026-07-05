@@ -566,7 +566,7 @@ export default function OnboardingView({ onComplete }) {
         payload.SMTP_PORT          = String(emailCfg.smtpPort)
         payload.SMTP_SECURE        = emailCfg.smtpSecure ? 'true' : 'false'
         payload.SMTP_USER          = emailCfg.smtpUser || emailCfg.notificationEmail
-        payload.SMTP_PASS          = emailCfg.smtpPassword
+        payload.SMTP_PASS          = (emailCfg.smtpPassword || '').replace(/\s+/g, '')
         payload.SMTP_FROM          = emailCfg.smtpFrom || `LuxRoom AI <${emailCfg.notificationEmail}>`
       }
       await window.luxroom?.settings.save(payload)
@@ -851,10 +851,19 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
   async function handleTestEmail() {
     setEmailTest('testing')
     try {
-      const r = await window.luxroom?.email?.test(emailCfg.notificationEmail)
-      setEmailTest(r?.ok !== false ? 'ok' : 'fail')
+      // Pass the just-entered config — settings aren't saved yet during onboarding.
+      const config = {
+        host: emailCfg.smtpHost,
+        port: emailCfg.smtpPort,
+        secure: emailCfg.smtpSecure,
+        user: emailCfg.smtpUser || emailCfg.notificationEmail,
+        pass: (emailCfg.smtpPassword || '').replace(/\s+/g, ''),
+        from: emailCfg.smtpFrom || `LuxRoom AI <${emailCfg.notificationEmail}>`,
+      }
+      const r = await window.luxroom?.email?.test(emailCfg.notificationEmail, config)
+      setEmailTest(r?.ok ? 'ok' : 'fail')
     } catch { setEmailTest('fail') }
-    setTimeout(() => setEmailTest(null), 4000)
+    setTimeout(() => setEmailTest(null), 5000)
   }
 
   const canGo = profile.name.trim().length > 0 && hasAt && emailCfg.smtpPassword.length > 0
@@ -931,13 +940,9 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
                     <div style={{ color: '#4ade80', fontSize: 12, fontWeight: 600 }}>
                       {preset.host} auto-configured
                     </div>
-                    <div style={{ color: '#3a6a3a', fontSize: 12, marginTop: 2 }}>{preset.note}</div>
-                    {preset.appPasswordLink && (
-                      <button
-                        onClick={() => window.luxroom?.shell?.openExternal(preset.appPasswordLink)}
-                        style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: '3px 0 0', display: 'block' }}
-                      >Get App Password →</button>
-                    )}
+                    <div style={{ color: '#3a6a3a', fontSize: 12, marginTop: 2 }}>
+                      Next, enter your App Password below.
+                    </div>
                   </div>
                 </div>
               )}

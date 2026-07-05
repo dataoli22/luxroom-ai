@@ -186,6 +186,8 @@ export default function SettingsView({ onEditProfile }) {
     try {
       // Translate camelCase UI fields → the UPPERCASE keys the backend reads.
       const payload = { ...form };
+      // App passwords (esp. Gmail's) are pasted with spaces — strip them.
+      if (payload.smtpPassword) payload.smtpPassword = payload.smtpPassword.replace(/\s+/g, '');
       for (const [camel, upper] of Object.entries(KEY_MAP)) {
         if (form[camel] !== undefined) {
           const v = form[camel];
@@ -204,8 +206,19 @@ export default function SettingsView({ onEditProfile }) {
     setEmailTestResult(null);
     setEmailTesting(true);
     try {
-      const result = await window.luxroom.email.test(form.notificationEmail);
-      setEmailTestResult({ ok: true, msg: result || 'Test email sent successfully.' });
+      const config = {
+        host: form.smtpHost,
+        port: form.smtpPort,
+        user: form.smtpUser || form.notificationEmail,
+        pass: (form.smtpPassword || '').replace(/\s+/g, ''),
+        from: form.smtpFrom || form.notificationEmail,
+      };
+      const result = await window.luxroom.email.test(form.notificationEmail, config);
+      if (result && result.ok) {
+        setEmailTestResult({ ok: true, msg: 'Test email sent — check your inbox.' });
+      } else {
+        setEmailTestResult({ ok: false, msg: (result && result.error) || 'Failed to send test email.' });
+      }
     } catch (err) {
       setEmailTestResult({ ok: false, msg: err.message || String(err) });
     } finally {

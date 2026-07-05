@@ -607,26 +607,50 @@ export default function OnboardingView({ onComplete }) {
         updateStep('ollama', { status: 'done', detail: `Already installed (${check.version})` })
       } else {
         await window.luxroom?.setup?.installOllama()
-        updateStep('ollama', { status: 'done', detail: 'Installed successfully' })
+        // Re-verify rather than trusting the install call — the installer may run
+        // interactively and finish slightly after the call returns.
+        const after = await window.luxroom?.setup?.checkOllama()
+        updateStep('ollama', after?.installed
+          ? { status: 'done', detail: 'Installed successfully' }
+          : { status: 'done', detail: 'Installer launched — if a window opened, finish it.' })
       }
     } catch (err) {
-      updateStep('ollama', { status: 'error', detail: err.message })
-      // don't abort — user can still use the app
+      // Don't cry failure if it actually installed. Re-check before showing an error.
+      const after = await window.luxroom?.setup?.checkOllama().catch(() => null)
+      updateStep('ollama', after?.installed
+        ? { status: 'done', detail: `Installed (${after.version})` }
+        : { status: 'error', detail: err.message })
     }
 
-    // Step 2 — pull model
+    // Step 2 — pull model (can take many minutes for multi-GB models)
     if (localModel) {
       updateStep('pull', { status: 'running', detail: 'Starting…' })
       try {
         await window.luxroom?.setup?.pullModel(localModel)
         updateStep('pull', { status: 'done', detail: 'Model ready' })
       } catch (err) {
-        updateStep('pull', { status: 'error', detail: err.message })
+        // A long pull can surface a transient error yet still complete. Verify by
+        // listing installed models before marking it failed.
+        let present = false
+        try {
+          const models = await window.luxroom?.setup?.listModels()
+          present = Array.isArray(models) && models.some(m => (m.name || '').split(':')[0] === localModel.split(':')[0])
+        } catch {}
+        updateStep('pull', present
+          ? { status: 'done', detail: 'Model ready' }
+          : { status: 'error', detail: err.message })
       }
     }
 
     unsubProgress?.()
     setInstallDone(true)
+  }
+
+  function retryInstall() {
+    const steps = installSteps.map(s => ({ ...s, status: 'pending', detail: '', pct: undefined }))
+    setInstallSteps(steps)
+    setInstallDone(false)
+    runInstall(steps, { ...profile, onboardingDone: true })
   }
 
   // ── Fast setup screen ──────────────────────────────────────────────────────
@@ -682,7 +706,7 @@ export default function OnboardingView({ onComplete }) {
                     borderRadius: 8, padding: '12px 16px', marginBottom: 16,
                     color: '#f87171', fontSize: 13, lineHeight: 1.6,
                   }}>
-                    One or more steps had an issue. You can retry from Settings → Configure Models, or the pipeline will fall back to cloud mode if configured.
+                    One or more steps had an issue. If you just installed or opened Ollama, click <strong style={{ color: '#fca5a5' }}>Retry</strong> below. You can also retry later in Settings → Models, or use a free cloud provider (Groq/Gemini) instead.
                   </div>
                 )}
                 {!anyError && (
@@ -700,16 +724,29 @@ export default function OnboardingView({ onComplete }) {
                     </div>
                   </div>
                 )}
+                {anyError && (
+                  <button
+                    onClick={retryInstall}
+                    style={{
+                      width: '100%', padding: '12px', borderRadius: 8, border: '1px solid #7c3aed',
+                      background: '#241a3a', color: '#c4b5fd', fontSize: 15, fontWeight: 700,
+                      cursor: 'pointer', marginBottom: 10,
+                    }}
+                  >
+                    ↻ Retry
+                  </button>
+                )}
                 <button
                   onClick={() => onComplete(finalProfile)}
                   style={{
                     width: '100%', padding: '12px', borderRadius: 8, border: 'none',
-                    background: 'linear-gradient(135deg, #7c3aed, #5b21b6)',
-                    color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-                    boxShadow: '0 4px 16px rgba(124,58,237,0.35)',
+                    background: anyError ? 'transparent' : 'linear-gradient(135deg, #7c3aed, #5b21b6)',
+                    color: anyError ? '#8080a8' : '#fff', fontSize: anyError ? 13 : 15,
+                    fontWeight: anyError ? 500 : 700, cursor: 'pointer',
+                    boxShadow: anyError ? 'none' : '0 4px 16px rgba(124,58,237,0.35)',
                   }}
                 >
-                  {anyError ? 'Continue anyway →' : 'Start scanning →'}
+                  {anyError ? 'Skip for now — continue →' : 'Start scanning →'}
                 </button>
               </div>
             )}

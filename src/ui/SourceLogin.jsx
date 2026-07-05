@@ -20,9 +20,14 @@ export default function SourceLogin({ source = 'appartager', label = 'Appartager
 
   async function connect() {
     setError('');
-    setPhase('waiting');
-    const r = await window.luxroom?.auth?.openLogin(source);
-    if (!r?.ok) { setError(r?.error || 'Could not open the login window.'); setPhase('idle'); }
+    try {
+      const r = await window.luxroom?.auth?.openLogin(source);
+      if (r?.ok) { setPhase('waiting'); }
+      else { setError(r?.error || 'Could not open the login window.'); setPhase('idle'); }
+    } catch (e) {
+      setError('Could not open the login window: ' + (e?.message || e));
+      setPhase('idle');
+    }
   }
   async function done() {
     setPhase('saving');
@@ -71,9 +76,12 @@ export default function SourceLogin({ source = 'appartager', label = 'Appartager
           <button onClick={disconnect} style={btn('transparent', '#8080a8', '#3a3a5a')}>Disconnect</button>
         )}
         {(phase === 'waiting' || phase === 'saving') && (
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button onClick={done} disabled={phase === 'saving'} style={btn('#0d2b1a', '#6ee7b7', '#1a4a1a')}>
               {phase === 'saving' ? 'Saving…' : "I've logged in"}
+            </button>
+            <button onClick={connect} disabled={phase === 'saving'} style={btn('#2a1f4a', '#c4b5fd', '#5a4a8a')}>
+              ⟳ Open login window
             </button>
             <button onClick={cancel} style={btn('transparent', '#8080a8', '#3a3a5a')}>Cancel</button>
           </div>
@@ -86,9 +94,9 @@ export default function SourceLogin({ source = 'appartager', label = 'Appartager
           borderLeft: '3px solid #fbbf24', borderRadius: 7, padding: '10px 13px',
           fontSize: 13, color: '#d0b070', lineHeight: 1.6,
         }}>
-          A browser window opened. Log in to <strong style={{ color: '#fbbf24' }}>{label}</strong> there,
-          then come back and click <strong style={{ color: '#6ee7b7' }}>“I've logged in”</strong>.
-          Don't close the window yourself — use the buttons here.
+          A <strong style={{ color: '#fbbf24' }}>{label}</strong> login window should have opened. Log in there,
+          then click <strong style={{ color: '#6ee7b7' }}>“I've logged in”</strong> here.
+          If you don't see it, click <strong style={{ color: '#c4b5fd' }}>“Open login window”</strong>.
         </div>
       )}
 

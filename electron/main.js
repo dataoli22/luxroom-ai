@@ -46,6 +46,25 @@ function resolveOllama() {
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
+// Talk to the Ollama HTTP server directly. This works whenever Ollama is
+// installed AND running, regardless of where the binary lives or whether it's
+// on the (possibly stale) PATH of this process — far more reliable than the CLI.
+function ollamaBase() {
+  try { return (_settings.getSettings().OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '') }
+  catch { return 'http://localhost:11434' }
+}
+function ollamaHeaders() {
+  const h = { 'Content-Type': 'application/json' }
+  try { const k = _settings.getSettings().OLLAMA_API_KEY; if (k) h.Authorization = `Bearer ${k}` } catch {}
+  return h
+}
+function humanSize(bytes) {
+  const b = Number(bytes)
+  if (!Number.isFinite(b) || b <= 0) return ''
+  const gb = b / 1e9
+  return gb >= 1 ? `${gb.toFixed(1)} GB` : `${Math.round(b / 1e6)} MB`
+}
+
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
 let mainWindow = null
@@ -568,7 +587,7 @@ ipcMain.handle('auth:save-login', async (_e, { source }) => {
 ipcMain.handle('auth:cancel-login', async () => _auth.cancelLogin())
 
 ipcMain.handle('auth:clear-login', async (_e, { source }) => {
-  const res = _auth.clearLogin(source, authDir())
+  const res = await _auth.clearLogin(source, authDir())
   const s = _settings.getSettings()
   const sourceAuth = { ...(s.SOURCE_AUTH || {}) }
   delete sourceAuth[source]
@@ -597,11 +616,17 @@ function pushSetupProgress(phase, message, pct, error = false) {
 }
 
 ipcMain.handle('setup:check-ollama', async () => {
+  // Prefer the running server — the most reliable "is Ollama usable" signal.
+  try {
+    const r = await fetch(`${ollamaBase()}/api/version`, { signal: AbortSignal.timeout(3000) })
+    if (r.ok) { const d = await r.json().catch(() => ({})); return { installed: true, running: true, version: d.version || 'running' } }
+  } catch { /* server not up — try the binary next */ }
   try {
     const { stdout } = await execFileAsync(resolveOllama(), ['--version'])
-    return { installed: true, version: stdout.trim() }
+    // Binary exists but server may be down — still "installed".
+    return { installed: true, running: false, version: stdout.trim() }
   } catch {
-    return { installed: false }
+    return { installed: false, running: false }
   }
 })
 
@@ -725,66 +750,113 @@ ipcMain.handle('setup:install-ollama', async () => {
   return { ok: true, silent: silentOk }
 })
 
+// Ensure the Ollama server is reachable; if not, try to start it via the binary.
+async function ensureOllamaServer() {
+  try {
+    const r = await fetch(`${ollamaBase()}/api/version`, { signal: AbortSignal.timeout(2500) })
+    if (r.ok) return true
+  } catch { /* not up yet */ }
+  // Try to start the server in the background, then wait for it.
+  try {
+    const bin = resolveOllama()
+    spawn(bin, ['serve'], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+  } catch { /* binary not found — nothing we can do */ }
+  for (let i = 0; i < 10; i++) {
+    await sleep(1500)
+    try {
+      const r = await fetch(`${ollamaBase()}/api/version`, { signal: AbortSignal.timeout(2500) })
+      if (r.ok) return true
+    } catch { /* keep waiting */ }
+  }
+  return false
+}
+
 ipcMain.handle('setup:pull-model', async (_e, model) => {
   if (typeof model !== 'string' || !/^[\w.:/-]+$/.test(model)) {
     throw new Error('Invalid model name')
   }
   pushSetupProgress('pull', `Starting download of ${model}…`, 0)
-  return new Promise((resolve, reject) => {
-    const child = spawn(resolveOllama(), ['pull', model], { shell: false })
-    child.stdout.on('data', data => {
-      for (const line of data.toString().split('\n').filter(Boolean)) {
-        const m = line.match(/(\d+)%/)
-        pushSetupProgress('pull', line.trim(), m ? parseInt(m[1], 10) : null)
+
+  const up = await ensureOllamaServer()
+  if (!up) {
+    const msg = 'Ollama is installed but not running. Open Ollama (Start menu / menu bar), then click Retry.'
+    pushSetupProgress('pull', msg, null, true)
+    throw new Error(msg)
+  }
+
+  // Pull via the HTTP API and stream NDJSON progress — no CLI/binary path needed.
+  let res
+  try {
+    res = await fetch(`${ollamaBase()}/api/pull`, {
+      method: 'POST',
+      headers: ollamaHeaders(),
+      body: JSON.stringify({ name: model, stream: true }),
+    })
+  } catch (err) {
+    const msg = `Could not reach Ollama: ${err.message}`
+    pushSetupProgress('pull', msg, null, true)
+    throw new Error(msg)
+  }
+  if (!res.ok || !res.body) {
+    const body = await res.text().catch(() => '')
+    const msg = `Ollama pull failed (${res.status}): ${body.slice(0, 200)}`
+    pushSetupProgress('pull', msg, null, true)
+    throw new Error(msg)
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      if (!line.trim()) continue
+      let obj
+      try { obj = JSON.parse(line) } catch { continue }
+      if (obj.error) {
+        pushSetupProgress('pull', obj.error, null, true)
+        throw new Error(obj.error)
       }
-    })
-    child.stderr.on('data', data => {
-      const line = data.toString().trim()
-      if (line) pushSetupProgress('pull', line, null)
-    })
-    child.on('close', code => {
-      if (code === 0) {
-        pushSetupProgress('pull', `${model} ready ✓`, 100)
-        resolve({ ok: true })
-      } else {
-        pushSetupProgress('pull', `Pull failed (exit ${code})`, null, true)
-        reject(new Error(`ollama pull exited with code ${code}`))
-      }
-    })
-    child.on('error', err => {
-      const hint = err.code === 'ENOENT'
-        ? 'Ollama is not installed yet. Install it first, then try again.'
-        : err.message
-      pushSetupProgress('pull', `Could not start Ollama: ${hint}`, null, true)
-      reject(new Error(hint))
-    })
-  })
+      const pct = (obj.total && obj.completed) ? Math.round((obj.completed / obj.total) * 100) : null
+      pushSetupProgress('pull', obj.status || 'Downloading…', pct)
+    }
+  }
+
+  pushSetupProgress('pull', `${model} ready ✓`, 100)
+  return { ok: true }
 })
 
 ipcMain.handle('setup:list-models', async () => {
   try {
-    const { stdout } = await execFileAsync(resolveOllama(), ['list'])
-    return stdout.trim().split('\n').slice(1)
-      .filter(l => l.trim())
-      .map(l => {
-        const parts = l.trim().split(/\s{2,}/)
-        return { name: parts[0] ?? '', size: parts[2] ?? '', modified: parts[3] ?? '' }
-      })
+    const r = await fetch(`${ollamaBase()}/api/tags`, { headers: ollamaHeaders(), signal: AbortSignal.timeout(5000) })
+    if (!r.ok) return []
+    const d = await r.json()
+    return (d.models ?? []).map(m => ({
+      name: m.name ?? m.model ?? '',
+      size: humanSize(m.size),
+      modified: m.modified_at ?? '',
+    }))
   } catch {
     return []
   }
 })
 
 ipcMain.handle('setup:remove-model', async (_e, model) => {
-  // Use spawn with explicit args — never concatenate user input into a shell string
   if (typeof model !== 'string' || !/^[\w.:/-]+$/.test(model)) {
     return { ok: false, error: 'Invalid model name' }
   }
-  return new Promise(resolve => {
-    const child = spawn(resolveOllama(), ['rm', model], { shell: false })
-    child.on('close', code =>
-      code === 0 ? resolve({ ok: true }) : resolve({ ok: false, error: `exit ${code}` })
-    )
-    child.on('error', err => resolve({ ok: false, error: err.message }))
-  })
+  try {
+    const r = await fetch(`${ollamaBase()}/api/delete`, {
+      method: 'DELETE',
+      headers: ollamaHeaders(),
+      body: JSON.stringify({ name: model }),
+    })
+    return r.ok ? { ok: true } : { ok: false, error: `status ${r.status}` }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
 })

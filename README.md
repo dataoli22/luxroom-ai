@@ -27,7 +27,7 @@ Pick your file:
 | Your computer | File to download |
 |---|---|
 | 🪟 Windows (any modern PC) | `LuxRoom-AI-Windows.exe` |
-| 🍎 Mac (M1/M2/M3/M4 — Apple Silicon) | `LuxRoom-AI-Mac-AppleSilicon.dmg` |
+| 🍎 Mac (M1/M2/M3/M4 — Apple Silicon) | `LuxRoom-AI-Mac-AppleSilicon.zip` |
 
 > **Intel Mac?** Not currently supported as a pre-built download. You can [build from source](#building-from-source) on any Mac.
 
@@ -52,10 +52,10 @@ Pick your file:
 
 ### macOS
 
-1. Download the `.dmg` from the [Releases](../../releases/latest) page
-2. Open the `.dmg` — a window appears with the LuxRoom AI icon
-3. Drag **LuxRoom AI** into the **Applications** folder shortcut in that window
-4. Open **Launchpad** (or go to Applications) and click LuxRoom AI
+1. Download the `.zip` from the [Releases](../../releases/latest) page
+2. Double-click the `.zip` to unzip it — you'll get **LuxRoom AI.app**
+3. Drag **LuxRoom AI.app** into your **Applications** folder
+4. **Right-click (or Control-click) the app → Open → Open** (do this the first time — a normal double-click is blocked for unsigned apps)
 5. Fill in the 3-field setup (name, email, app password) — done in under 2 minutes
 6. The app automatically downloads and installs Ollama in the background — takes 2–5 minutes the first time, then instant on every launch after
 
@@ -63,13 +63,13 @@ Pick your file:
 >
 > macOS blocks apps that aren't signed with an Apple Developer certificate ($99/year). As a free open-source app, LuxRoom AI is not enrolled in Apple's programme. It is **not** malicious — the full source code is in this repository.
 >
-> If you see **"LuxRoom AI is damaged and can't be opened"**, open Terminal and run this command:
+> The **right-click → Open** step above avoids this for most people. If you still see **"LuxRoom AI is damaged and can't be opened"**, open Terminal and run:
 > ```bash
 > xattr -cr "/Applications/LuxRoom AI.app"
 > ```
-> Then try opening the app again — it will work.
+> Then open the app again — it will work.
 >
-> If you see **"Cannot be opened because it is from an unidentified developer"**: right-click (or Control-click) the app icon → **Open** → **Open**. You only need to do this once.
+> If neither works: **System Settings → Privacy & Security** → scroll to Security → click **Open Anyway**.
 >
 > If neither works: go to **System Settings → Privacy & Security** → scroll to Security → click **Open Anyway**.
 
@@ -193,16 +193,15 @@ npm run dev          # opens the app in development mode with hot reload
 ```bash
 git tag v1.0.2
 git push origin v1.0.2
-# GitHub Actions produces:
-#   LuxRoom AI Setup 1.0.2.exe      (Windows, built on windows-latest)
-#   LuxRoom AI-1.0.2-x64.dmg       (macOS Intel, built on macos-13)
-#   LuxRoom AI-1.0.2-arm64.dmg     (macOS Apple Silicon, built on macos-14)
+# GitHub Actions produces (both built in the cloud — no Mac device needed):
+#   LuxRoom-AI-Windows.exe                (Windows, built on windows-latest)
+#   LuxRoom-AI-Mac-AppleSilicon.zip       (macOS Apple Silicon, built on macos-14)
 ```
 
 **To build locally:**
 ```bash
 npm run build        # Windows .exe  (run on Windows)
-npm run build:mac    # macOS .dmg    (must run on a Mac)
+npm run build:mac    # macOS .zip    (run on a Mac)
 npm run build:linux  # Linux .AppImage
 ```
 

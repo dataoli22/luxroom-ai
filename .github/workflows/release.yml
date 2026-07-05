@@ -35,8 +35,10 @@ jobs:
           tag_name: ${{ github.ref_name }}
 
   build-mac-arm64:
-    name: macOS Apple Silicon (arm64)
-    runs-on: [self-hosted, macOS, ARM64]
+    name: macOS Apple Silicon (zip)
+    # GitHub-hosted Apple Silicon runner — free for public repos. No physical Mac
+    # or self-hosted runner needed. Produces an unsigned .zip (Apple Silicon).
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
 
@@ -48,16 +50,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build macOS arm64 DMG
+      - name: Build macOS arm64 zip
         run: npm run build:mac -- --arm64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Skip code-signing on the hosted runner (no certificate).
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
-      - name: Strip quarantine flag from DMG
-        run: xattr -cr release/*.dmg
-
-      - name: Upload macOS arm64 DMG
+      - name: Upload macOS arm64 zip
         uses: softprops/action-gh-release@v2
         with:
-          files: release/*.dmg
+          files: release/*.zip
           tag_name: ${{ github.ref_name }}

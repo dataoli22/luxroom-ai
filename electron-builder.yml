@@ -31,13 +31,14 @@ nsis:
 
 mac:
   target:
-    - target: dmg
+    - target: zip
       arch:
         - arm64
   category: public.app-category.productivity
-  hardenedRuntime: true
-  gatekeeperAssess: false
-  artifactName: LuxRoom-AI-Mac-AppleSilicon.dmg
+  # Unsigned build (no Apple certificate) — distributed as a zip. Users open it
+  # with right-click → Open the first time (see README).
+  identity: null
+  artifactName: LuxRoom-AI-Mac-AppleSilicon.zip
 
 linux:
   target: AppImage

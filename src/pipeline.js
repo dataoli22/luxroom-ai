@@ -29,8 +29,26 @@ let _listingCount = 0;
 let _scanCycles = 0;
 let _job = null;
 
+// Live scan progress
+let _scanPhase = 'idle';     // 'idle' | 'crawling' | 'analysing'
+let _scanCurrent = 0;
+let _scanTotal = 0;
+let _scanStartedAt = null;
+
+function emitScanProgress() {
+  scanEmitter.emit('progress', {
+    phase: _scanPhase,
+    current: _scanCurrent,
+    total: _scanTotal,
+    startedAt: _scanStartedAt,
+  });
+}
+
 export function getPipelineStatus() {
-  return { running: _running, lastCrawl: _lastCrawl, listingCount: _listingCount, scanCycles: _scanCycles };
+  return {
+    running: _running, lastCrawl: _lastCrawl, listingCount: _listingCount, scanCycles: _scanCycles,
+    scanPhase: _scanPhase, scanCurrent: _scanCurrent, scanTotal: _scanTotal, scanStartedAt: _scanStartedAt,
+  };
 }
 
 export async function processNewListings() {
@@ -42,6 +60,11 @@ export async function processNewListings() {
   _running = true;
   let _savedThisCycle = 0;
   let completed = false;
+  _scanPhase = 'crawling';
+  _scanCurrent = 0;
+  _scanTotal = 0;
+  _scanStartedAt = Date.now();
+  emitScanProgress();
   log(`[pipeline] Starting crawl — ${new Date().toISOString()}`);
 
   // Defer DB writes to disk until the whole cycle is done — sql.js otherwise
@@ -55,10 +78,16 @@ export async function processNewListings() {
     } catch (err) {
       logError('[pipeline] crawlAll() failed:', err);
       _running = false;
+      _scanPhase = 'idle';
+      emitScanProgress();
       return;
     }
 
     log(`[pipeline] Crawled ${rawRecords.length} raw record(s)`);
+    _scanPhase = 'analysing';
+    _scanTotal = rawRecords.length;
+    _scanCurrent = 0;
+    emitScanProgress();
 
     // Per-listing work — steps a through i. Returns { saved } so the caller can
     // tally results. `continue` in the old sequential loop becomes an early
@@ -178,7 +207,13 @@ export async function processNewListings() {
     }
 
     // Process listings with bounded concurrency (max 3 in flight at once).
-    await mapLimit(rawRecords, 3, processOne);
+    // Bump the live progress counter as each listing finishes.
+    await mapLimit(rawRecords, 3, async (rec, i) => {
+      const r = await processOne(rec, i);
+      _scanCurrent++;
+      emitScanProgress();
+      return r;
+    });
 
     // Stale-listing pass — flag anything not seen recently. Never let a failure
     // here break the cycle.
@@ -197,6 +232,8 @@ export async function processNewListings() {
   } finally {
     // Flush all deferred writes to disk exactly once, before the UI refreshes.
     endBatch();
+    _scanPhase = 'idle';
+    emitScanProgress();
   }
 
   if (completed) {

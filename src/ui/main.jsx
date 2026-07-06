@@ -12,6 +12,10 @@ style.textContent = `
     0%, 100% { transform: translateY(0); opacity: 0.3; }
     50% { transform: translateY(-6px); opacity: 1; }
   }
+  @keyframes scanSlide {
+    0% { left: -35%; }
+    100% { left: 100%; }
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0f0f13; color: #e8e8f0; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; }
 `

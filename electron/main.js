@@ -389,6 +389,13 @@ app.whenReady().then(async () => {
   // Set userData path so settings.js can locate its config file
   process.env.ELECTRON_USER_DATA = app.getPath('userData')
 
+  // Point Playwright at the Chromium headless shell bundled in the app so the
+  // crawler works on machines that never ran `playwright install`. (In dev it
+  // uses the default per-user browser cache.)
+  if (app.isPackaged) {
+    process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(process.resourcesPath, 'pw-browsers')
+  }
+
   await loadModules()
 
   _settings.applyToEnv(_settings.getSettings())
@@ -401,6 +408,13 @@ app.whenReady().then(async () => {
   _pipeline.logEmitter.on('log', (line) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('log:line', line)
+    }
+  })
+
+  // Live scan progress → renderer (for the progress bar / timer)
+  _pipeline.scanEmitter.on('progress', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('scan:progress', data)
     }
   })
 

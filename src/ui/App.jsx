@@ -6,6 +6,7 @@ import SettingsView from './SettingsView.jsx'
 import OnboardingView from './OnboardingView.jsx'
 import ModelManagerView from './ModelManagerView.jsx'
 import HelpView from './HelpView.jsx'
+import ScanProgress from './ScanProgress.jsx'
 
 const TABS = ['listings', 'approvals', 'log', 'settings', 'help']
 const TAB_LABELS = { listings: '🏠 Listings', approvals: '✉️ Approvals', log: '📋 Log', settings: '⚙️ Settings', help: '❓ Help' }
@@ -255,6 +256,9 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Live scan progress bar (hidden when idle) */}
+      <ScanProgress initial={{ phase: status.scanPhase, current: status.scanCurrent, total: status.scanTotal, startedAt: status.scanStartedAt }} />
 
       {/* Content */}
       <div style={{ flex: 1, overflow: 'hidden' }}>

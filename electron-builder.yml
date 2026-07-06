@@ -15,6 +15,13 @@ files:
   - node_modules/**/*
   - package.json
 
+# Bundle the Playwright Chromium headless shell so scraping works on machines
+# that never ran `playwright install`. Installed by `npm run pw:install` at build
+# time; loaded at runtime via PLAYWRIGHT_BROWSERS_PATH = resources/pw-browsers.
+extraResources:
+  - from: pw-browsers
+    to: pw-browsers
+
 win:
   target:
     - target: nsis

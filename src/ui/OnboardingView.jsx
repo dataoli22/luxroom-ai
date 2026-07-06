@@ -1083,6 +1083,37 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
               />
             </div>
 
+            {/* Plain-language explainer: how the AI works + what's configurable */}
+            <div style={{
+              background: 'linear-gradient(135deg, #12102a 0%, #0d0d1a 100%)',
+              border: '1px solid #2a2060', borderRadius: 10, padding: '14px 16px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 16 }}>🧠</span>
+                <span style={{ color: '#c4b5fd', fontWeight: 700, fontSize: 13 }}>How the AI works — nothing to set up now</span>
+              </div>
+              <div style={{ color: '#9090b8', fontSize: 12.5, lineHeight: 1.65, marginBottom: 10 }}>
+                An AI reads every listing and ranks it for you. There are three ways to run it — we've already
+                picked the free one, so you can just click below. Switch anytime in <strong style={{ color: '#c4b5fd' }}>Settings → AI &amp; Analysis</strong>.
+              </div>
+              {[
+                { icon: '🆓', tag: 'Set up for you', tagColor: '#6ee7b7', title: 'On your laptop', desc: 'Free & private. We download a small AI model automatically — no signup, works offline.' },
+                { icon: '⚡', tag: 'Optional', tagColor: '#a78bfa', title: 'Free cloud (Groq / Gemini)', desc: 'Faster if your laptop is slow. Needs a free key — a 2-minute signup, no credit card.' },
+                { icon: '💎', tag: 'Optional', tagColor: '#f0a868', title: 'Paid (Anthropic / OpenAI)', desc: 'Top quality, a small cost per listing. Add your key in Settings if you want it.' },
+              ].map(o => (
+                <div key={o.title} style={{ display: 'flex', gap: 9, alignItems: 'flex-start', marginTop: 8 }}>
+                  <span style={{ fontSize: 14, flexShrink: 0, lineHeight: 1.4 }}>{o.icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                      <span style={{ color: '#e8e8f0', fontSize: 12.5, fontWeight: 600 }}>{o.title}</span>
+                      <span style={{ fontSize: 9.5, fontWeight: 700, color: o.tagColor, background: o.tagColor + '18', border: `1px solid ${o.tagColor}44`, borderRadius: 9, padding: '1px 7px' }}>{o.tag}</span>
+                    </div>
+                    <div style={{ color: '#7a7a9a', fontSize: 12, lineHeight: 1.5, marginTop: 1 }}>{o.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
             {/* AI status pill */}
             {hwDone && (
               <div style={{
@@ -1093,8 +1124,8 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
                 <span style={{ fontSize: 13 }}>🧠</span>
                 <div style={{ flex: 1, fontSize: 12, color: '#7a7a9a' }}>
                   {hw
-                    ? <>AI: <span style={{ color: localModel ? '#c4b5fd' : c.sub }}>{localModel || 'auto-selected model'}</span> · runs locally on your device</>
-                    : <>AI: will install Ollama automatically after setup</>
+                    ? <>Your setup: <span style={{ color: localModel ? '#c4b5fd' : c.sub }}>{localModel || 'auto-selected model'}</span> · free, runs locally on your device</>
+                    : <>Your setup: Ollama (free, local) installs automatically after setup</>
                   }
                 </div>
               </div>

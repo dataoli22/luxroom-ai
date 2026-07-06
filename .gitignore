@@ -31,3 +31,6 @@ Desktop.ini
 luxroom_ai_prd.md
 housing_analyser.jsx
 UsersolichAppDataLocal*
+
+# Playwright browsers bundled at build time (installed via npm run pw:install)
+pw-browsers/

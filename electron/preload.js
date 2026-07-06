@@ -25,6 +25,11 @@ contextBridge.exposeInMainWorld('luxroom', {
       ipcRenderer.on('scan:complete', handler);
       return () => ipcRenderer.removeListener('scan:complete', handler);
     },
+    onProgress: (callback) => {
+      const handler = (_, data) => callback(data);
+      ipcRenderer.on('scan:progress', handler);
+      return () => ipcRenderer.removeListener('scan:progress', handler);
+    },
   },
 
   auth: {

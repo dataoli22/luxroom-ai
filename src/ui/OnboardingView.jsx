@@ -274,6 +274,25 @@ function getSmtpPreset(email) {
   return SMTP_PRESETS[domain] ?? null
 }
 
+// Common domain typos → the address the user almost certainly meant. Used to
+// offer a one-click fix so the App Password help / test email don't silently
+// disappear when someone mistypes "gmail".
+const DOMAIN_TYPOS = {
+  'gmai.com': 'gmail.com', 'gmial.com': 'gmail.com', 'gmaill.com': 'gmail.com',
+  'gmail.co': 'gmail.com', 'gmail.con': 'gmail.com', 'gmail.cm': 'gmail.com',
+  'gmail.om': 'gmail.com', 'gnail.com': 'gmail.com', 'gamil.com': 'gmail.com',
+  'gmailc.om': 'gmail.com', 'hotmial.com': 'hotmail.com', 'outlok.com': 'outlook.com',
+  'yaho.com': 'yahoo.com', 'yahooo.com': 'yahoo.com',
+}
+function suggestEmailFix(email) {
+  const at = email.indexOf('@')
+  if (at < 0) return null
+  const domain = email.slice(at + 1).toLowerCase()
+  const fixed = DOMAIN_TYPOS[domain]
+  if (fixed && fixed !== domain) return email.slice(0, at + 1) + fixed
+  return null
+}
+
 const CLOUD_KEY_LINKS = {
   'https://api.groq.com/openai/v1':    { text: 'Groq is free — no credit card. Sign up, go to API Keys and create one.', link: 'https://console.groq.com/keys', linkLabel: 'Open Groq Console →' },
   'https://openrouter.ai/api/v1':      { text: 'OpenRouter has free models. Create an account then go to Keys.', link: 'https://openrouter.ai/keys', linkLabel: 'Open OpenRouter →' },
@@ -877,6 +896,7 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
   const preset      = getSmtpPreset(emailCfg.notificationEmail)
   const hasAt       = emailCfg.notificationEmail.includes('@')
   const knownDomain = preset !== null && hasAt
+  const emailFix    = suggestEmailFix(emailCfg.notificationEmail)
   const [emailTest, setEmailTest] = useState(null)
 
   function onEmailChange(email) {
@@ -911,10 +931,10 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '100vh', background: c.bg, padding: '32px 24px', overflowY: 'auto',
+      height: '100vh', overflowY: 'auto', background: c.bg,
+      padding: '32px 24px', boxSizing: 'border-box',
     }}>
-      <div style={{ width: '100%', maxWidth: 520 }}>
+      <div style={{ width: '100%', maxWidth: 520, margin: '0 auto' }}>
 
         {/* Brand */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
@@ -966,6 +986,20 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
               <input style={inputStyle} type="email" value={emailCfg.notificationEmail}
                 onChange={e => onEmailChange(e.target.value)}
                 placeholder="you@gmail.com" />
+              {emailFix && !knownDomain && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap',
+                  background: '#1a1400', border: '1px solid #5a4400', borderLeft: '3px solid #fbbf24',
+                  borderRadius: 7, padding: '8px 12px',
+                }}>
+                  <span style={{ color: '#fbbf24', fontSize: 13 }}>Did you mean</span>
+                  <button
+                    onClick={() => onEmailChange(emailFix)}
+                    style={{ background: '#2a1f4a', border: '1px solid #5a4a8a', color: '#c4b5fd', fontSize: 13, fontWeight: 700, cursor: 'pointer', borderRadius: 6, padding: '3px 10px' }}
+                  >{emailFix}</button>
+                  <span style={{ color: '#a89060', fontSize: 12 }}>? Click to fix.</span>
+                </div>
+              )}
               {knownDomain && (
                 <div style={{
                   display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 8,

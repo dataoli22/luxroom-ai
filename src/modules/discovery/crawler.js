@@ -34,6 +34,19 @@ const USER_AGENT = process.platform === 'darwin'
 const DELAY_MIN_MS       = 900;
 const DELAY_MAX_MS       = 2200;
 const MIN_LINKS_THRESHOLD = 3;      // tiers 2 & 3 trigger below this
+
+// Light anti-bot measures (no size cost). These help borderline sites; heavy
+// protection (DataDome/Cloudflare on Wortimmo, Roomlala) still blocks us — that
+// needs residential proxies, not just a browser flag.
+const LAUNCH_ARGS = ['--disable-blink-features=AutomationControlled'];
+const EXTRA_HEADERS = {
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8,de;q=0.7',
+  'sec-ch-ua': '"Chromium";v="125", "Not.A/Brand";v="24"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"',
+  'Upgrade-Insecure-Requests': '1',
+};
 const MAX_LISTINGS_PER_SOURCE = 15; // visit at most this many detail pages/source
 const SOURCE_TIMEOUT_MS  = 150_000; // give up on a single source after 2.5 min
 const LLM_HTML_CHARS     = 10_000;  // chars fed per LLM call
@@ -916,9 +929,10 @@ export async function crawlSource(sourceConfig, browser) {
   const newRecords = [];
   const contextOpts = {
     userAgent: USER_AGENT,
-    viewport: { width: 1280, height: 900 },
+    viewport: { width: 1366, height: 900 },
     locale: 'fr-LU',
     timezoneId: 'Europe/Luxembourg',
+    extraHTTPHeaders: EXTRA_HEADERS,
   };
 
   // Login-gated sources (e.g. Appartager): reuse the session the user captured
@@ -930,6 +944,10 @@ export async function crawlSource(sourceConfig, browser) {
   }
 
   const context = await browser.newContext(contextOpts);
+  // Hide the automation flag some sites check.
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  });
 
   const page = await context.newPage();
 
@@ -1058,7 +1076,7 @@ function withTimeout(promise, ms, msg) {
 export async function crawlAll(onSourceRecords, onSourceDone) {
   await db.initDb();
 
-  const browser        = await chromium.launch({ headless: true });
+  const browser        = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
   const allNewRecords  = [];
   const total          = ACTIVE_SOURCES.length;
   let   done           = 0;

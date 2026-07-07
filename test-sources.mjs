@@ -17,8 +17,18 @@ const UA = process.platform === 'darwin'
   ? 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
   : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
+const EXTRA_HEADERS = {
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8,de;q=0.7',
+  'sec-ch-ua': '"Chromium";v="125", "Not.A/Brand";v="24"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"',
+  'Upgrade-Insecure-Requests': '1',
+};
+
 async function checkSource(browser, src) {
-  const ctx = await browser.newContext({ userAgent: UA, locale: 'fr-LU', timezoneId: 'Europe/Luxembourg' });
+  const ctx = await browser.newContext({ userAgent: UA, locale: 'fr-LU', timezoneId: 'Europe/Luxembourg', viewport: { width: 1366, height: 900 }, extraHTTPHeaders: EXTRA_HEADERS });
+  await ctx.addInitScript(() => { Object.defineProperty(navigator, 'webdriver', { get: () => undefined }); });
   const page = await ctx.newPage();
   await page.route('**/*.{png,jpg,jpeg,gif,webp,svg,woff,woff2,ttf}', r => r.abort());
   const url = src.searchUrls[0];
@@ -43,7 +53,7 @@ async function checkSource(browser, src) {
 
 (async () => {
   console.log(`Source health & latency test — ${SOURCES.length} sources\n${'='.repeat(64)}`);
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, args: ['--disable-blink-features=AutomationControlled'] });
   const results = [];
   try {
     for (const src of SOURCES) {          // sequential for clean latency numbers

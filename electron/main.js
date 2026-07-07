@@ -531,7 +531,7 @@ ipcMain.handle('ai:active-provider', async () => {
 // Is the AI usable? A cloud key OR a running Ollama with at least one model.
 ipcMain.handle('ai:status', async () => {
   const s = _settings.getSettings()
-  const hasCloudKey = !!(s.groqApiKey || s.geminiApiKey || s.openaiApiKey || s.anthropicApiKey || s.ANTHROPIC_API_KEY)
+  const hasCloudKey = !!(s.OLLAMA_API_KEY || s.groqApiKey || s.geminiApiKey || s.openaiApiKey || s.anthropicApiKey || s.ANTHROPIC_API_KEY)
   let ollamaRunning = await isOllamaUp()
   // If there's no cloud key and Ollama isn't up, nudge it to start (non-blocking)
   // so any already-installed models are detected on this or the next poll.

@@ -26,7 +26,10 @@ const hasAnthropicKey = (s) => !!(s.anthropicApiKey || s.ANTHROPIC_API_KEY || pr
 export function activeProvider(settings) {
   let provider = (settings.aiProvider || "auto").toLowerCase();
 
+  // Auto: prefer any configured CLOUD option (fast, no local CPU); the local
+  // on-device model is the LAST resort. Ollama's own hosted API counts as cloud.
   if (provider === "auto") {
+    if (settings.OLLAMA_API_KEY) return "ollama-cloud";
     if (settings.groqApiKey) return "groq";
     if (settings.geminiApiKey) return "gemini";
     if (settings.openaiApiKey) return "openai";
@@ -37,6 +40,7 @@ export function activeProvider(settings) {
   if (provider === "openai" && !settings.openaiApiKey) provider = "ollama";
   else if (provider === "gemini" && !settings.geminiApiKey) provider = "ollama";
   else if (provider === "groq" && !settings.groqApiKey) provider = "ollama";
+  else if (provider === "ollama-cloud" && !settings.OLLAMA_API_KEY) provider = "ollama";
   else if (provider === "anthropic" && !hasAnthropicKey(settings)) provider = "ollama";
   return provider;
 }
@@ -147,6 +151,9 @@ export async function complete(settings, systemPrompt, userMessage, opts = {}) {
       return callOpenAICompatible("https://api.groq.com/openai/v1/chat/completions", settings.groqApiKey, settings.groqModel || "llama-3.3-70b-versatile", systemPrompt, userMessage, o);
     case "gemini":
       return callGemini(settings, systemPrompt, userMessage, o);
+    case "ollama-cloud":
+      // Ollama's hosted (cloud) models — fast, no local CPU. OpenAI-compatible.
+      return callOpenAICompatible("https://ollama.com/v1/chat/completions", settings.OLLAMA_API_KEY, settings.ollamaCloudModel || "gpt-oss:20b", systemPrompt, userMessage, o);
     case "hermes":
       return callOllama(settings, settings.hermesModel || "hermes3", systemPrompt, userMessage, o);
     case "anthropic":

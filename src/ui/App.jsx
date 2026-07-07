@@ -216,8 +216,8 @@ export default function App() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {aiProvider && (() => {
-            const LABEL = { groq: 'Groq', gemini: 'Gemini', openai: 'OpenAI', anthropic: 'Claude', ollama: 'Local', hermes: 'Hermes' }
-            const isFree = ['groq', 'gemini', 'ollama', 'hermes'].includes(aiProvider)
+            const LABEL = { groq: 'Groq', 'ollama-cloud': 'Ollama Cloud', gemini: 'Gemini', openai: 'OpenAI', anthropic: 'Claude', ollama: 'Local', hermes: 'Hermes' }
+            const isFree = ['groq', 'ollama-cloud', 'gemini', 'ollama', 'hermes'].includes(aiProvider)
             return (
               <button onClick={() => setShowAiSetup(true)} title="Which AI is analysing your listings — click to configure"
                 style={{
@@ -291,7 +291,7 @@ export default function App() {
 
       {/* Content */}
       <div style={{ flex: 1, overflow: 'hidden' }}>
-        {tab === 'listings' && <ListingsView status={status} />}
+        {tab === 'listings' && <ListingsView status={status} aiProvider={aiProvider} onConfigureAi={() => setShowAiSetup(true)} />}
         {tab === 'approvals' && <ApprovalsView />}
         {tab === 'log' && <LogView status={status} scanInterval={scanInterval} />}
         {tab === 'settings' && <SettingsView onEditProfile={handleEditProfile} />}

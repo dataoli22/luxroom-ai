@@ -399,7 +399,9 @@ function ListingCard({ listing, onDraftCreated }) {
   );
 }
 
-export default function ListingsView({ status = {} }) {
+const AI_LABEL = { groq: 'Groq', 'ollama-cloud': 'Ollama Cloud', gemini: 'Gemini', openai: 'OpenAI', anthropic: 'Claude', ollama: 'Local (CPU)', hermes: 'Hermes' };
+
+export default function ListingsView({ status = {}, aiProvider, onConfigureAi }) {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [verdictFilter, setVerdictFilter] = useState('All');
@@ -470,6 +472,25 @@ export default function ListingsView({ status = {} }) {
         boxSizing: 'border-box',
       }}
     >
+      {/* AI configuration bar */}
+      {aiProvider && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          marginBottom: 16, padding: '10px 14px', borderRadius: 10,
+          background: '#0f172a', border: '1px solid #1e293b',
+        }}>
+          <span style={{ fontSize: 14 }}>🧠</span>
+          <span style={{ fontSize: 13, color: '#94a3b8' }}>
+            Analysing with <strong style={{ color: '#e2e8f0' }}>{AI_LABEL[aiProvider] || aiProvider}</strong>
+            {aiProvider === 'ollama' && <span style={{ color: '#f0a868' }}> — local & slower. Add a cloud key for speed.</span>}
+          </span>
+          <button onClick={onConfigureAi} style={{
+            marginLeft: 'auto', background: '#1e1633', border: '1px solid #7c5cbf',
+            color: '#c4b5fd', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          }}>⚙ Configure AI</button>
+        </div>
+      )}
+
       {/* Filter bar */}
       <div
         style={{

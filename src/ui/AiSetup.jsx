@@ -25,7 +25,8 @@ export default function AiSetup({ blocking, onDone, onClose }) {
   const [status, setStatus] = useState(null)
   const [mode, setMode] = useState('cloud') // 'cloud' | 'local'
   const [groqKey, setGroqKey] = useState('')
-  const [savingKey, setSavingKey] = useState(false)
+  const [ollamaKey, setOllamaKey] = useState('')
+  const [savingKey, setSavingKey] = useState('')   // which key is saving
   const [keyMsg, setKeyMsg] = useState('')
   const [pull, setPull] = useState(null) // { model, pct, msg, error, done }
 
@@ -35,16 +36,16 @@ export default function AiSetup({ blocking, onDone, onClose }) {
   const configured = !!status?.configured
   const busy = pull && !pull.done && !pull.error
 
-  async function saveGroq() {
-    if (!groqKey.trim()) return
-    setSavingKey(true); setKeyMsg('')
+  async function saveKey(which, field, value) {
+    if (!value.trim()) return
+    setSavingKey(which); setKeyMsg('')
     try {
-      await window.luxroom?.settings.save({ groqApiKey: groqKey.trim(), aiProvider: 'auto' })
+      await window.luxroom?.settings.save({ [field]: value.trim(), aiProvider: 'auto' })
       setKeyMsg('✓ Saved — cloud AI is ready.')
       await refresh()
     } catch (e) {
       setKeyMsg('Could not save: ' + (e?.message || e))
-    } finally { setSavingKey(false) }
+    } finally { setSavingKey('') }
   }
 
   async function downloadModel(name) {
@@ -99,40 +100,60 @@ export default function AiSetup({ blocking, onDone, onClose }) {
 
         {/* Mode tabs */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {tabBtn('cloud', '⚡ Free cloud — fastest')}
-          {tabBtn('local', '💻 On my device')}
+          {tabBtn('cloud', '☁️ Cloud — fast (recommended)')}
+          {tabBtn('local', '💻 On my device (fallback)')}
         </div>
 
         {mode === 'cloud' && (
           <div>
-            <p style={{ fontSize: 13, color: '#9090b8', lineHeight: 1.6, margin: '0 0 12px' }}>
-              Groq gives fast AI on a generous free tier — no credit card. Create a key (about a minute) and paste it here.
+            <p style={{ fontSize: 13, color: '#9090b8', lineHeight: 1.6, margin: '0 0 14px' }}>
+              Cloud AI runs on powerful servers — <strong>fast, and it won't strain your laptop</strong>. Add either key below (a
+              1-minute signup). This is the recommended way to run LuxRoom.
             </p>
-            {status?.hasCloudKey ? (
-              <div style={{ color: c.greenDim, fontSize: 13, fontWeight: 600, marginBottom: 8 }}>✓ A cloud key is configured.</div>
-            ) : null}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <input type="password" value={groqKey} onChange={e => setGroqKey(e.target.value)} placeholder="Paste your Groq key (gsk_…)"
-                style={{ flex: 1, minWidth: 200, background: c.bg, border: `1px solid ${c.border}`, color: c.text, padding: '10px 12px', borderRadius: 8, fontSize: 13, outline: 'none' }} />
-              <button onClick={saveGroq} disabled={!groqKey.trim() || savingKey} style={btn(groqKey.trim() ? c.accent : c.border, '#fff', c.accent, { cursor: groqKey.trim() ? 'pointer' : 'default' })}>
-                {savingKey ? 'Saving…' : 'Save key'}
-              </button>
-            </div>
-            <div style={{ marginTop: 10 }}>
+            {status?.hasCloudKey && (
+              <div style={{ color: c.greenDim, fontSize: 13, fontWeight: 600, marginBottom: 10 }}>✓ A cloud key is configured.</div>
+            )}
+
+            {/* Groq */}
+            <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
+              <div style={{ color: c.text, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Groq <span style={{ color: c.greenDim, fontWeight: 600, fontSize: 11 }}>· free, no card</span></div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input type="password" value={groqKey} onChange={e => setGroqKey(e.target.value)} placeholder="Paste your Groq key (gsk_…)"
+                  style={{ flex: 1, minWidth: 180, background: c.bg, border: `1px solid ${c.border}`, color: c.text, padding: '10px 12px', borderRadius: 8, fontSize: 13, outline: 'none' }} />
+                <button onClick={() => saveKey('groq', 'groqApiKey', groqKey)} disabled={!groqKey.trim() || savingKey} style={btn(groqKey.trim() ? c.accent : c.border, '#fff', c.accent, { cursor: groqKey.trim() ? 'pointer' : 'default' })}>
+                  {savingKey === 'groq' ? 'Saving…' : 'Save'}
+                </button>
+              </div>
               <button onClick={() => window.luxroom?.shell?.openExternal('https://console.groq.com/keys')}
-                style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: 13, cursor: 'pointer', textDecoration: 'underline', padding: 0, fontWeight: 600 }}>
+                style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: '8px 0 0', fontWeight: 600 }}>
                 Get a free Groq key →
               </button>
-              {keyMsg && <span style={{ marginLeft: 12, fontSize: 12, color: keyMsg.startsWith('✓') ? c.green : '#f87171' }}>{keyMsg}</span>}
             </div>
+
+            {/* Ollama Cloud */}
+            <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ color: c.text, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Ollama Cloud <span style={{ color: c.sub, fontWeight: 600, fontSize: 11 }}>· hosted models via your Ollama key</span></div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input type="password" value={ollamaKey} onChange={e => setOllamaKey(e.target.value)} placeholder="Paste your Ollama API key"
+                  style={{ flex: 1, minWidth: 180, background: c.bg, border: `1px solid ${c.border}`, color: c.text, padding: '10px 12px', borderRadius: 8, fontSize: 13, outline: 'none' }} />
+                <button onClick={() => saveKey('ollama', 'OLLAMA_API_KEY', ollamaKey)} disabled={!ollamaKey.trim() || savingKey} style={btn(ollamaKey.trim() ? c.accent : c.border, '#fff', c.accent, { cursor: ollamaKey.trim() ? 'pointer' : 'default' })}>
+                  {savingKey === 'ollama' ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+              <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com/settings/keys')}
+                style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: '8px 0 0', fontWeight: 600 }}>
+                Get your Ollama key →
+              </button>
+            </div>
+            {keyMsg && <div style={{ marginTop: 10, fontSize: 12, color: keyMsg.startsWith('✓') ? c.green : '#f87171' }}>{keyMsg}</div>}
           </div>
         )}
 
         {mode === 'local' && (
           <div>
             <p style={{ fontSize: 13, color: '#9090b8', lineHeight: 1.6, margin: '0 0 12px' }}>
-              Runs free and private on your laptop. The app installs and runs everything for you — <strong>no terminal needed</strong>.
-              Downloading a model takes a few minutes, once.
+              A fallback that runs free and private on your laptop — but it's <strong>slower</strong> (uses your CPU). The app
+              installs and runs everything for you, <strong>no terminal needed</strong>. Cloud above is recommended.
             </p>
             {status?.models?.length > 0 && (
               <div style={{ marginBottom: 12, fontSize: 13, color: c.greenDim }}>

@@ -35,3 +35,6 @@ UsersolichAppDataLocal*
 # Playwright browsers bundled at build time (installed via npm run pw:install)
 pw-browsers/
 output/
+
+# Personal / not for the public repo
+LINKEDIN_POST.md

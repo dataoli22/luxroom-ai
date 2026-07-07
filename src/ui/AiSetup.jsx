@@ -63,19 +63,41 @@ export default function AiSetup({ blocking, onDone, onClose }) {
     } finally { setSavingKey('') }
   }
 
-  async function downloadModel(name) {
-    setPull({ model: name, pct: null, msg: 'Preparing…', error: false, done: false })
+  // Local setup is a mandatory two-step: install Ollama (if missing), then pull the
+  // model. The blocking gate won't let the user continue until a model is present,
+  // so choosing local means actually completing this — no half-configured state.
+  async function installLocal(name) {
+    setPull({ model: name, pct: null, msg: 'Checking Ollama…', error: false, done: false })
     const unsub = window.luxroom?.setup?.onProgress(({ phase, message, pct, error }) => {
-      if (phase !== 'pull') return
       setPull(p => ({ ...(p || {}), model: name, msg: message, pct: pct ?? p?.pct, error: !!error }))
     })
     try {
+      // Step 1 — Ollama must be installed & running.
+      const check = await window.luxroom?.setup?.checkOllama()
+      if (!check?.installed) {
+        setPull(p => ({ ...(p || {}), msg: 'Installing Ollama…', pct: null }))
+        await window.luxroom?.setup?.installOllama()
+      }
+      // Step 2 — pull the model (multi-GB; can take a few minutes).
+      setPull(p => ({ ...(p || {}), msg: `Downloading ${name}…`, pct: null }))
       await window.luxroom?.setup?.pullModel(name)
       setPull({ model: name, pct: 100, msg: `${name} is ready ✓`, error: false, done: true })
-      await window.luxroom?.settings.save({ OLLAMA_MODEL: name })
+      await window.luxroom?.settings.save({ OLLAMA_MODEL: name, aiProvider: 'auto' })
       await refresh()
     } catch (e) {
-      setPull({ model: name, pct: null, msg: e?.message || 'Download failed', error: true, done: false })
+      // A long pull can surface a transient error yet still finish — verify before failing.
+      let present = false
+      try {
+        const models = await window.luxroom?.setup?.listModels()
+        present = Array.isArray(models) && models.some(m => (m.name || '').split(':')[0] === name.split(':')[0])
+      } catch {}
+      if (present) {
+        setPull({ model: name, pct: 100, msg: `${name} is ready ✓`, error: false, done: true })
+        await window.luxroom?.settings.save({ OLLAMA_MODEL: name, aiProvider: 'auto' })
+        await refresh()
+      } else {
+        setPull({ model: name, pct: null, msg: e?.message || 'Setup failed', error: true, done: false })
+      }
     } finally { unsub?.() }
   }
 
@@ -182,22 +204,49 @@ export default function AiSetup({ blocking, onDone, onClose }) {
           </div>
         )}
 
-        {mode === 'local' && (
+        {mode === 'local' && (() => {
+          const haveHermes = status?.models?.some(x => x.name.split(':')[0] === 'hermes3')
+          const LIGHTER = QUICK_MODELS.filter(m => m.name.split(':')[0] !== 'hermes3')
+          return (
           <div>
             <p style={{ fontSize: 13, color: '#9090b8', lineHeight: 1.6, margin: '0 0 12px' }}>
-              A fallback that runs free and private on your laptop — but it's <strong>slower</strong> (uses your CPU). The app
-              installs and runs everything for you, <strong>no terminal needed</strong>. Cloud above is recommended.
+              Runs free and private on your laptop — but it's <strong>slower</strong> (uses your CPU). The app installs
+              Ollama and downloads the model for you, <strong>no terminal needed</strong>. You'll need to
+              <strong> finish this download to continue</strong> — cloud above is faster if you'd rather skip it.
             </p>
             {status?.models?.length > 0 && (
               <div style={{ marginBottom: 12, fontSize: 13, color: c.greenDim }}>
                 ✓ Installed: {status.models.map(m => m.name).join(', ')}
               </div>
             )}
+
+            {/* Primary, recommended local setup: Ollama + Hermes */}
+            <button onClick={() => !haveHermes && !busy && installLocal('hermes3')} disabled={haveHermes || busy}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, textAlign: 'left', padding: '14px 16px', borderRadius: 10, width: '100%',
+                border: `1.5px solid ${haveHermes ? '#1a4a1a' : c.accent}`, background: haveHermes ? '#0d1a0d' : '#1a1233', cursor: haveHermes || busy ? 'default' : 'pointer' }}>
+              <div>
+                <div style={{ color: haveHermes ? c.greenDim : '#c4b5fd', fontWeight: 700, fontSize: 14 }}>
+                  {haveHermes ? '✓ Local AI ready (Hermes)' : 'Set up local AI — Ollama + Hermes'}
+                </div>
+                <div style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
+                  {haveHermes ? 'Hermes is installed and analysing locally.' : 'Recommended local model — best analysis quality. Installs Ollama automatically.'}
+                </div>
+              </div>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <span style={{ color: c.sub, fontSize: 12 }}>4.7 GB</span>
+                {!haveHermes && <span style={{ background: c.accent, color: '#fff', borderRadius: 6, padding: '3px 11px', fontSize: 11, fontWeight: 700 }}>Install</span>}
+              </span>
+            </button>
+
+            {/* Lighter alternatives for low-RAM laptops */}
+            <div style={{ color: c.sub, fontSize: 11.5, margin: '14px 0 7px', fontWeight: 600 }}>
+              Laptop under 16 GB RAM? Pick a lighter model instead:
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {QUICK_MODELS.map(m => {
+              {LIGHTER.map(m => {
                 const have = status?.models?.some(x => x.name.split(':')[0] === m.name.split(':')[0])
                 return (
-                  <button key={m.name} onClick={() => !have && !busy && downloadModel(m.name)} disabled={have || busy}
+                  <button key={m.name} onClick={() => !have && !busy && installLocal(m.name)} disabled={have || busy}
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, textAlign: 'left', padding: '10px 14px', borderRadius: 8, width: '100%',
                       border: `1px solid ${have ? '#1a4a1a' : c.border}`, background: have ? '#0d1a0d' : 'transparent', cursor: have || busy ? 'default' : 'pointer' }}>
                     <div>
@@ -226,7 +275,8 @@ export default function AiSetup({ blocking, onDone, onClose }) {
               </div>
             )}
           </div>
-        )}
+          )
+        })()}
 
         {/* Guide */}
         <button onClick={() => setShowGuide(g => !g)}

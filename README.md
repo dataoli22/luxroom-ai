@@ -4,7 +4,7 @@
 
 Made for international students arriving in Luxembourg who need a room fast — and don't want to refresh a dozen websites every day or write emails in French and German.
 
-> 📖 **Also read:** [The Complete Student Housing Guide](STUDENT_HOUSING_GUIDE.md) — Facebook & WhatsApp groups, university housing, scam warnings, budgets, and everything LuxRoom AI *can't* reach for you.
+> 📖 **Guides:** [Complete Student Housing Guide](STUDENT_HOUSING_GUIDE.md) ([🇫🇷 FR](STUDENT_HOUSING_GUIDE.fr.md) · [🇩🇪 DE](STUDENT_HOUSING_GUIDE.de.md)) · [🧠 AI Models — Playground & Cookbook](AI_MODELS_GUIDE.md)
 
 ---
 
@@ -85,6 +85,8 @@ LuxRoom needs an AI to read and rank listings. You'll see a setup screen with tw
 
 You can't miss this step — the app won't start scanning until the AI is ready. You can switch options any time later.
 
+> Not sure which to pick? The **[AI Models — Playground & Cookbook](AI_MODELS_GUIDE.md)** has a recipe for every laptop and budget.
+
 ### 3. Connect Appartager (optional, recommended)
 
 Appartager is one of the best room sources but only shows listings to members. Click **Connect**, log in once in the window that opens, and LuxRoom AI will search it for you from then on.
@@ -146,6 +148,14 @@ The first scan takes 10–20 minutes — watch the progress bar. If it finishes 
 The area guide is Luxembourg-specific, but you can change your city and preferred areas in Settings and it'll still work.
 
 **Something else?** Open the **❓ Help** tab in the app, or [report an issue on GitHub](../../issues).
+
+---
+
+## 📚 More guides
+
+- **[Complete Student Housing Guide](STUDENT_HOUSING_GUIDE.md)** — the places LuxRoom can't reach for you: Facebook & WhatsApp groups, university housing, scam-avoidance, deposits & domiciliation, budgets, and a week-by-week plan.
+  Also in **[Français 🇫🇷](STUDENT_HOUSING_GUIDE.fr.md)** and **[Deutsch 🇩🇪](STUDENT_HOUSING_GUIDE.de.md)**.
+- **[AI Models — Playground & Cookbook](AI_MODELS_GUIDE.md)** — how to configure the AI: plain-language options, recipes for every laptop and budget, a "playground" for comparing models, and full model/provider reference tables.
 
 ---
 

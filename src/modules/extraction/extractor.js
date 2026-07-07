@@ -18,6 +18,7 @@
 
 import fetch from 'node-fetch';
 import { getSettings } from '../../settings.js';
+import { complete } from '../ai/complete.js';
 
 const MAX_HTML_CHARS = 8000;
 const MAX_RETRIES    = 1;
@@ -205,13 +206,9 @@ export async function extractListing(rawRecord) {
   }
 
   const settings = getSettings();
-  const mode     = settings.INFERENCE_MODE === 'cloud' ? 'cloud' : 'local';
   const prepared = prepareHtml(html);
 
-  const prompt = `${EXTRACTION_PROMPT}
-
----
-Listing URL: ${url || 'unknown'}
+  const userMessage = `Listing URL: ${url || 'unknown'}
 Source: ${source || 'unknown'}
 Timestamp: ${timestamp || 'unknown'}
 
@@ -223,27 +220,23 @@ ${prepared}`;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     if (attempt > 0) console.warn(`[extractor] Retry ${attempt}/${MAX_RETRIES} for ${url}`);
     try {
-      const text   = mode === 'cloud'
-        ? await extractCloud(prompt, settings)
-        : await extractLocal(prompt, settings);
+      // Route through the same provider the user configured (Ollama Cloud, Groq,
+      // local Ollama, …) — NOT a hardcoded local-only path.
+      const text   = await complete(settings, EXTRACTION_PROMPT, userMessage, { json: true, maxTokens: 1024 });
 
       const parsed = parseJson(text);
       if (!parsed) {
-        lastError = new Error(`JSON parse failed: ${text.slice(0, 200)}`);
+        lastError = new Error(`JSON parse failed: ${(text || '').slice(0, 200)}`);
         console.error(`[extractor] ${lastError.message}`);
         continue;
       }
 
       parsed.estimatedCommute = 'unknown';
-      console.log(`[extractor] OK (${mode}): ${url}`);
+      console.log(`[extractor] OK: ${url}`);
       return parsed;
     } catch (err) {
       lastError = err;
       console.error(`[extractor] Attempt ${attempt + 1} failed for ${url}: ${err.message}`);
-      // If Ollama says model not found, clear cache so next attempt re-probes
-      if (mode === 'local' && /not found|does not exist/i.test(err.message)) {
-        _resolvedModel = null;
-      }
     }
   }
 

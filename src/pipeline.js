@@ -106,13 +106,23 @@ export async function processNewListings() {
         analysed = await analyseListing(extracted);
       } catch (err) {
         logError(`[pipeline] analyseListing() threw for ${label}:`, err);
-        return { saved: false };
+        analysed = null;
       }
 
-      // Step d: skip if null
+      // Step d: if analysis failed, still keep the listing visible (with whatever
+      // we extracted) rather than dropping it — every scraped room should show up.
       if (analysed == null) {
-        log(`[pipeline] Analysis returned null for ${label} — skipping`);
-        return { saved: false };
+        log(`[pipeline] Analysis unavailable for ${label} — saving as REVIEW`);
+        analysed = {
+          ...extracted,
+          verdict: 'REVIEW',
+          score: null,
+          corridor: extracted.corridor ?? 'unknown',
+          pros: [],
+          cons: [],
+          dealbreakers: [],
+          topReason: 'Not auto-analysed — open the listing to review it yourself.',
+        };
       }
 
       // Step e: score — analyser outputs `score`, scorer expects `housingScore`.

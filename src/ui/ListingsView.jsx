@@ -401,6 +401,26 @@ function ListingCard({ listing, onDraftCreated }) {
 
 const AI_LABEL = { groq: 'Groq', 'ollama-cloud': 'Ollama Cloud', gemini: 'Gemini', openai: 'OpenAI', anthropic: 'Claude', ollama: 'Local (CPU)', hermes: 'Hermes' };
 
+// Export listings to a CSV that Excel/Sheets open directly (UTF-8 BOM, no deps).
+function exportListingsToExcel(listings) {
+  const esc = (v) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const header = ['Verdict', 'Score', 'Opportunity', 'Title', 'Location', 'Corridor', 'Rent', 'Commute', 'Availability', 'Domiciliation', 'Source', 'URL', 'Top reason', 'Pros', 'Cons'];
+  const rows = listings.map(l => [
+    l.verdict, l.score, l.opportunityScore, l.listingTitle, l.location, l.corridor,
+    l.rentTotal, l.estimatedCommute, l.availability, (l.domiciliationFlag ?? l.domiciliation),
+    l.source, l.url, l.topReason, (l.pros || []).join('; '), (l.cons || []).join('; '),
+  ]);
+  const csv = '﻿' + [header, ...rows].map(r => r.map(esc).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `luxroom-listings-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 export default function ListingsView({ status = {}, aiProvider, onConfigureAi }) {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -537,6 +557,21 @@ export default function ListingsView({ status = {}, aiProvider, onConfigureAi })
             </button>
           ))}
         </div>
+
+        {/* Export */}
+        <button
+          onClick={() => exportListingsToExcel(filtered)}
+          disabled={filtered.length === 0}
+          title="Download the current listings as a spreadsheet (opens in Excel)"
+          style={{
+            marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
+            background: '#132038', color: filtered.length ? '#a5b4fc' : '#475569',
+            border: '1px solid #334155', borderRadius: 6, padding: '6px 12px',
+            fontSize: 12, fontWeight: 600, cursor: filtered.length ? 'pointer' : 'not-allowed',
+          }}
+        >
+          ⬇ Export to Excel
+        </button>
       </div>
 
       {/* Live scan banner */}

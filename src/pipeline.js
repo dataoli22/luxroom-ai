@@ -7,7 +7,7 @@ import { analyseListing } from './modules/analysis/analyser.js';
 import { scoreOpportunity } from './modules/opportunity/scorer.js';
 import { notifyAll } from './modules/notifications/notifier.js';
 import { generateDraft } from './modules/messaging/messenger.js';
-import { initDb, upsertListing, saveDraft, beginBatch, endBatch, markStaleListings } from './db/database.js';
+import { initDb, upsertListing, saveDraft, beginBatch, endBatch, markStaleListings, countListings } from './db/database.js';
 
 export const logEmitter      = new EventEmitter();
 export const approvalsEmitter = new EventEmitter();
@@ -268,6 +268,9 @@ export async function processNewListings() {
     _running = false;
     _scanCycles++;
     completed = true;
+    // Reconcile the live counter with the actual number of rows in the DB, so the
+    // "listings in DB" figure matches what the Listings tab and Excel export show.
+    try { _listingCount = await countListings(); } catch {}
     log(`[pipeline] Crawl cycle complete — ${_lastCrawl}`);
   } finally {
     // Flush all deferred writes to disk exactly once, before the UI refreshes.
@@ -307,6 +310,8 @@ export async function startPipeline() {
   const cronPattern = `0 */${hours} * * *`;
 
   await initDb();
+  // Seed the live counter from the DB so the status bar is correct before any scan.
+  try { _listingCount = await countListings(); } catch {}
   log(`[pipeline] LuxRoom AI started — crawling every ${hours} hours`);
 
   _job = new CronJob(cronPattern, () => {

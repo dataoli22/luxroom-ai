@@ -239,6 +239,13 @@ export async function getAllListings() {
   return all('SELECT * FROM listings ORDER BY opportunityScore DESC').map(deserializeListing);
 }
 
+// Real number of unique listings in the DB (not cumulative upserts).
+export async function countListings() {
+  await getDb();
+  const row = get('SELECT COUNT(*) AS n FROM listings');
+  return row?.n ?? 0;
+}
+
 export async function updateListing(url, fields) {
   await getDb();
   const jsonFields = new Set(['pros', 'cons', 'dealbreakers', 'messageDrafts', 'sentEvents']);

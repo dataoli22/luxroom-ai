@@ -404,7 +404,13 @@ const AI_LABEL = { groq: 'Groq', 'ollama-cloud': 'Ollama Cloud', gemini: 'Gemini
 
 // Export listings to a CSV that Excel/Sheets open directly (UTF-8 BOM, no deps).
 function exportListingsToExcel(listings) {
-  const esc = (v) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  // Collapse any embedded line breaks/tabs to a single space first — a stray newline
+  // inside a cell is the usual reason Excel appears to "lose" rows on import. Then
+  // quote fields that contain commas or quotes. This guarantees one line per listing.
+  const esc = (v) => {
+    const s = (v == null ? '' : String(v)).replace(/[\r\n\t]+/g, ' ').trim();
+    return /[",]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
   const header = ['Verdict', 'Score', 'Opportunity', 'Title', 'Location', 'Corridor', 'Rent', 'Commute', 'Availability', 'Domiciliation', 'Source', 'URL', 'Top reason', 'Pros', 'Cons'];
   const rows = listings.map(l => [
     l.verdict, l.score, l.opportunityScore, l.listingTitle, l.location, l.corridor,
@@ -413,9 +419,11 @@ function exportListingsToExcel(listings) {
   ]);
   const csv = '﻿' + [header, ...rows].map(r => r.map(esc).join(',')).join('\r\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  // Filename with a full timestamp so repeated exports don't overwrite each other.
+  const stamp = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `luxroom-listings-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `luxroom-listings-${stamp}.csv`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -486,7 +494,8 @@ export default function ListingsView({ status = {}, aiProvider, onConfigureAi })
     <div
       style={{
         backgroundColor: '#020617',
-        minHeight: '100vh',
+        height: '100%',
+        overflowY: 'auto',
         color: '#f1f5f9',
         fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
         padding: '24px 20px',

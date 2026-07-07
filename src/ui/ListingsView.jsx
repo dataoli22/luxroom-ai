@@ -4,6 +4,7 @@ const VERDICT_COLORS = {
   STRONG: '#4ade80',
   CONSIDER: '#facc15',
   SKIP: '#f87171',
+  REVIEW: '#8b9cb8',
 };
 
 const CORRIDOR_LABELS = {

@@ -36,11 +36,17 @@ function buildSystemPrompt(profile = {}) {
     profile.additionalNotes?.trim() && `Additional context: ${profile.additionalNotes}`,
   ].filter(Boolean).map(s => `- ${s}`).join("\n");
 
-  // Luxembourg-specific commute intelligence
-  const luxembourgContext = city.toLowerCase().includes("luxembourg") ? `
+  // Luxembourg-specific commute intelligence — biased toward the student's campus
+  const campus = profile.campus || (commuteTo.toLowerCase().includes('belval') || commuteTo.toLowerCase().includes('esch') ? 'belval' : 'kirchberg');
+  const campusContext = campus === 'belval' ? `
+- The student commutes to the BELVAL campus (Esch-sur-Alzette, in the south / Minett). Score southern towns HIGHEST on commute: Belval, Esch-sur-Alzette, Differdange, Schifflange, Dudelange, Bettembourg are all close (~5–20 min). CFL Line 60 / 90 serves this corridor.
+- Luxembourg City is ~35–45 min from Belval by train — acceptable but not ideal. Northern (Line 10) towns are FAR from Belval — penalise them on commute for this student.` : `
+- The student commutes to the KIRCHBERG campus (Luxembourg City). Score city neighbourhoods and the CFL Line 10 north corridor (Mersch, Ettelbruck, Schieren, Lintgen, Lorentzweiler) HIGHEST — Line 10 connects DIRECTLY to Pfaffenthal-Kirchberg station (Mersch ~25 min, Ettelbruck ~35 min). These northern towns are UNDERRATED and should score well despite being outside the city.
+- Southern towns (Esch, Belval, Differdange) are ~35–45 min from Kirchberg — acceptable but not ideal for this student.`;
 
-COMMUTE CONTEXT FOR LUXEMBOURG:
-- The CFL Line 10 north corridor (Mersch, Ettelbruck, Schieren, Lintgen, Lorentzweiler) connects DIRECTLY to Pfaffenthal-Kirchberg station — Mersch is only ~25 min, Ettelbruck ~35 min. These northern towns are UNDERRATED and should score well on commute despite being outside Luxembourg City.
+  const luxembourgContext = city.toLowerCase().includes("luxembourg") || commuteTo.toLowerCase().includes('belval') || commuteTo.toLowerCase().includes('kirchberg') ? `
+
+COMMUTE CONTEXT FOR LUXEMBOURG:${campusContext}
 - Must be INSIDE Luxembourg (not France, Belgium, or Germany) if domiciliation is required — a Luxembourg address is needed for residence permits.
 
 Set the "corridor" field as:

@@ -475,15 +475,66 @@ function InstallStepRow({ step }) {
 
 // ─── Step metadata ────────────────────────────────────────────────────────────
 
+// Location & preferences come first — the AI setup is handled by its own
+// dedicated gate, so it is intentionally NOT a step here.
 const STEPS = [
-  { title: 'Welcome',                   subtitle: "Let's set up LuxRoom AI for your housing search. Takes about 3 minutes." },
-  { title: 'Your Device',               subtitle: 'We scanned your hardware and recommend the best AI setup for your laptop.' },
+  { title: 'Location & Commute',        subtitle: 'Where do you want to live, and which campus do you commute to?' },
   { title: 'What You\'re Looking For',  subtitle: 'Tell us about the kind of place you need.' },
-  { title: 'Location & Commute',        subtitle: 'Where do you want to live, and where do you need to get to?' },
   { title: 'Budget & Timing',           subtitle: 'What can you spend, and when do you need to move?' },
   { title: 'Final Preferences',         subtitle: 'A few more details so the AI knows exactly what to look for.' },
+  { title: 'About You',                 subtitle: 'Your name and the languages you can read listings in.' },
   { title: 'Notifications & Approvals', subtitle: 'Choose how you get alerted and how much the agent does on its own.' },
 ]
+
+// ─── Campus presets ───────────────────────────────────────────────────────────
+// The University of Luxembourg has two main campuses. Picking one auto-fills the
+// commute destination and the best areas to search, so students don't end up with
+// listings on the wrong side of the country.
+const CAMPUS_PRESETS = {
+  kirchberg: {
+    label: 'Kirchberg',
+    sub: 'Luxembourg City · main campus',
+    emoji: '🏙️',
+    commuteTo: 'Kirchberg — University of Luxembourg',
+    preferredAreas: 'Kirchberg, Limpertsberg, Bonnevoie, Belair, Gare, Mersch, Lintgen, Walferdange, Steinsel',
+  },
+  belval: {
+    label: 'Belval',
+    sub: 'Esch-sur-Alzette · south',
+    emoji: '🏭',
+    commuteTo: 'Belval — University of Luxembourg',
+    preferredAreas: 'Belval, Esch-sur-Alzette, Differdange, Schifflange, Dudelange, Bettembourg',
+  },
+  other: {
+    label: 'Other / not a student',
+    sub: "I'll set my own destination",
+    emoji: '📍',
+    commuteTo: '',
+    preferredAreas: '',
+  },
+}
+
+function CampusPicker({ value, onChange }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+      {Object.entries(CAMPUS_PRESETS).map(([key, p]) => {
+        const active = value === key
+        return (
+          <button key={key} type="button" onClick={() => onChange(key)} style={{
+            textAlign: 'left', padding: '11px 12px', borderRadius: 10, cursor: 'pointer',
+            border: `1.5px solid ${active ? '#7c3aed' : '#2a2a3a'}`,
+            background: active ? '#1a1233' : '#0d0d1a',
+            transition: 'all 0.15s',
+          }}>
+            <div style={{ fontSize: 18, marginBottom: 3 }}>{p.emoji}</div>
+            <div style={{ color: active ? '#c4b5fd' : '#e8e8f0', fontWeight: 700, fontSize: 13 }}>{p.label}</div>
+            <div style={{ color: '#7a7a9a', fontSize: 11, marginTop: 1, lineHeight: 1.35 }}>{p.sub}</div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 // ─── Default state ────────────────────────────────────────────────────────────
 
@@ -491,8 +542,9 @@ const STEPS = [
 const FAST_DEFAULTS = {
   housingType: 'room', furnished: 'any', smokingAllowed: false, genderPolicy: 'any',
   city: 'Luxembourg City',
-  preferredAreas: 'Kirchberg, Limpertsberg, Bonnevoie, Mersch, Lintgen, Walferdange, Steinsel',
-  commuteTo: '', maxCommuteMins: 60,
+  campus: 'kirchberg',
+  preferredAreas: CAMPUS_PRESETS.kirchberg.preferredAreas,
+  commuteTo: CAMPUS_PRESETS.kirchberg.commuteTo, maxCommuteMins: 60,
   maxBudget: '750', currency: 'EUR', moveInBy: '',
   domiciliationRequired: false, petsAllowed: false, parkingRequired: false,
   additionalNotes: '',
@@ -510,10 +562,14 @@ const DEFAULT_EMAIL = {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function OnboardingView({ onComplete }) {
-  const [fastMode, setFastMode] = useState(true)   // default: quick setup
+export default function OnboardingView({ onComplete, editMode = false, initialProfile = null }) {
+  // Editing an existing profile goes straight to the full customisation wizard —
+  // no AI setup (that lives in its own gate), no quick-setup screen.
+  const [fastMode, setFastMode] = useState(!editMode)
   const [step, setStep] = useState(0)
-  const [profile, setProfile] = useState(DEFAULT_PROFILE)
+  const [profile, setProfile] = useState(
+    initialProfile ? { ...DEFAULT_PROFILE, ...initialProfile } : DEFAULT_PROFILE
+  )
   const [emailCfg, setEmailCfg] = useState(DEFAULT_EMAIL)
   const [hw, setHw] = useState(null)
   const [hwDone, setHwDone] = useState(false)
@@ -551,16 +607,22 @@ export default function OnboardingView({ onComplete }) {
   function sp(key, val)  { setProfile(p => ({ ...p, [key]: val })) }
   function se(key, val)  { setEmailCfg(p => ({ ...p, [key]: val })) }
 
-  function canAdvance() {
-    if (step === 0) return profile.name.trim().length > 0
-    if (step === 3) return profile.city.trim().length > 0
-    if (step === 4) return profile.maxBudget !== '' && Number(profile.maxBudget) > 0
-    return true
+  // Picking a campus fills in the commute destination and the best areas to search.
+  function selectCampus(key) {
+    const preset = CAMPUS_PRESETS[key]
+    setProfile(p => ({
+      ...p,
+      campus: key,
+      ...(preset && key !== 'other' ? { commuteTo: preset.commuteTo, preferredAreas: preset.preferredAreas } : {}),
+    }))
   }
+
+  // Every step is optional — the user can Continue without editing anything.
+  function canAdvance() { return true }
 
   const isLast = step === STEPS.length - 1
 
-  async function handleFinish() {
+  async function handleFinish({ skipInstall = false } = {}) {
     setSaving(true)
     try {
       const emailOn = notifyChannels.includes('email')
@@ -590,8 +652,10 @@ export default function OnboardingView({ onComplete }) {
       }
       await window.luxroom?.settings.save(payload)
 
-      // For local mode, run the install/pull phase before entering the app
-      if (inferenceMode === 'local') {
+      // For local mode, run the install/pull phase before entering the app.
+      // Skipped when editing an existing profile or finishing the customisation
+      // wizard — the AI is set up separately in its dedicated gate.
+      if (inferenceMode === 'local' && !editMode && !skipInstall) {
         const steps = [
           { id: 'ollama', label: 'Install Ollama', status: 'pending', detail: '' },
           localModel ? { id: 'pull',   label: `Download model — ${localModel}`, status: 'pending', detail: '' } : null,
@@ -820,22 +884,12 @@ export default function OnboardingView({ onComplete }) {
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            {step === 0 && <StepAboutYou profile={profile} set={sp} />}
-            {step === 1 && (
-              <StepDevice
-                hw={hw} hwDone={hwDone}
-                inferenceMode={inferenceMode} setInferenceMode={setInferenceMode}
-                cloudApiUrl={cloudApiUrl} setCloudApiUrl={setCloudApiUrl}
-                cloudApiKey={cloudApiKey} setCloudApiKey={setCloudApiKey}
-                cloudModel={cloudModel} setCloudModel={setCloudModel}
-                localModel={localModel} setLocalModel={setLocalModel}
-              />
-            )}
-            {step === 2 && <StepHousingType profile={profile} set={sp} />}
-            {step === 3 && <StepLocation profile={profile} set={sp} />}
-            {step === 4 && <StepBudget profile={profile} set={sp} />}
-            {step === 5 && <StepPreferences profile={profile} set={sp} />}
-            {step === 6 && (
+            {step === 0 && <StepLocation profile={profile} set={sp} selectCampus={selectCampus} />}
+            {step === 1 && <StepHousingType profile={profile} set={sp} />}
+            {step === 2 && <StepBudget profile={profile} set={sp} />}
+            {step === 3 && <StepPreferences profile={profile} set={sp} />}
+            {step === 4 && <StepAboutYou profile={profile} set={sp} />}
+            {step === 5 && (
               <StepNotifications
                 cfg={emailCfg} set={se}
                 notifyChannels={notifyChannels} setNotifyChannels={setNotifyChannels}
@@ -861,19 +915,19 @@ export default function OnboardingView({ onComplete }) {
           )}
 
           <button
-            onClick={isLast ? handleFinish : () => setStep(s => s + 1)}
-            disabled={!canAdvance() || saving}
+            onClick={isLast ? () => handleFinish({ skipInstall: true }) : () => setStep(s => s + 1)}
+            disabled={saving}
             style={{
               padding: '10px 28px', borderRadius: '8px', border: 'none',
-              background: canAdvance() && !saving ? 'linear-gradient(135deg, #7c3aed, #5b21b6)' : c.border,
-              color: canAdvance() && !saving ? '#fff' : c.sub,
+              background: !saving ? 'linear-gradient(135deg, #7c3aed, #5b21b6)' : c.border,
+              color: !saving ? '#fff' : c.sub,
               fontSize: '14px', fontWeight: '700',
-              cursor: canAdvance() && !saving ? 'pointer' : 'default',
-              boxShadow: canAdvance() && !saving ? '0 4px 16px rgba(124,58,237,0.35)' : 'none',
+              cursor: !saving ? 'pointer' : 'default',
+              boxShadow: !saving ? '0 4px 16px rgba(124,58,237,0.35)' : 'none',
               transition: 'all 0.15s',
             }}
           >
-            {saving ? 'Saving…' : isLast ? '🚀 Start Searching' : 'Continue →'}
+            {saving ? 'Saving…' : isLast ? (editMode ? '✓ Save profile' : '🚀 Start Searching') : 'Continue →'}
           </button>
         </div>
       </div>
@@ -929,6 +983,15 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
     ? { text: preset.note, link: preset.appPasswordLink, linkLabel: 'Open in browser →' }
     : { text: 'Use your email account password or an app-specific password if 2-factor is enabled.' }
 
+  function selectCampus(key) {
+    const p = CAMPUS_PRESETS[key]
+    setProfile(prev => ({
+      ...prev,
+      campus: key,
+      ...(p && key !== 'other' ? { commuteTo: p.commuteTo, preferredAreas: p.preferredAreas } : {}),
+    }))
+  }
+
   return (
     <div style={{
       height: '100vh', overflowY: 'auto', background: c.bg,
@@ -979,6 +1042,15 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
               <input autoFocus style={inputStyle} value={profile.name}
                 onChange={e => setProfile(p => ({ ...p, name: e.target.value }))}
                 placeholder="e.g. Priya" />
+            </div>
+
+            {/* Campus — drives commute + which areas to search */}
+            <div>
+              <label style={labelStyle}>Your University of Luxembourg campus</label>
+              <CampusPicker value={profile.campus} onChange={selectCampus} />
+              <p style={{ color: '#5a5a7a', fontSize: 12, margin: '6px 0 0', lineHeight: 1.5 }}>
+                Picks the right areas to search so you don't get listings on the wrong side of the country.
+              </p>
             </div>
 
             <div>
@@ -1182,15 +1254,15 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
           </div>
         </div>
 
-        {/* Customise link */}
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <button onClick={onCustomise} style={{
-            background: 'none', border: 'none', color: '#4a4a6a',
-            fontSize: 13, cursor: 'pointer', textDecoration: 'underline', padding: 0,
-          }}>
-            Customise budget, areas, housing type, and more →
-          </button>
-        </div>
+        {/* Customise — prominent so users know they can fine-tune everything */}
+        <button onClick={onCustomise} style={{
+          width: '100%', marginTop: 14, padding: '13px 18px', borderRadius: 10,
+          border: '1.5px solid #3a2f66', background: '#15122b',
+          color: '#c4b5fd', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        }}>
+          ⚙️ Customise everything — budget, areas, housing type &amp; more →
+        </button>
 
       </div>
     </div>
@@ -1458,7 +1530,7 @@ function StepHousingType({ profile, set }) {
 
 // ─── Step 3: Location & Commute ───────────────────────────────────────────────
 
-function StepLocation({ profile, set }) {
+function StepLocation({ profile, set, selectCampus }) {
   const isLux = profile.city.toLowerCase().includes('luxembourg')
 
   return (
@@ -1467,6 +1539,16 @@ function StepLocation({ profile, set }) {
         Every listing is scored partly on <Term>how long the commute is</Term> to your destination. The agent estimates public transport travel time and penalises listings that are too far.<br /><br />
         <Term>Key tip:</Term> don't limit your search to the city. The CFL <Term>Line 10</Term> north runs direct trains to Kirchberg — towns like Mersch are only ~25 min away and dramatically cheaper. Many students miss this.
       </ExplainBox>
+
+      <div style={{ gridColumn: '1 / -1' }}>
+        <label style={{ ...labelStyle, marginBottom: 8, display: 'block' }}>
+          Which University of Luxembourg campus do you attend?
+        </label>
+        <CampusPicker value={profile.campus} onChange={selectCampus} />
+        <p style={{ color: '#5a5a7a', fontSize: 12, margin: '8px 0 0', lineHeight: 1.5 }}>
+          This sets your commute destination and the best areas to search, so you don't get listings on the wrong side of the country. You can still fine-tune everything below.
+        </p>
+      </div>
 
       <Field l="City or region" helper="The agent will search housing sites for this area" fullWidth>
         <input style={inputStyle} value={profile.city} autoFocus

@@ -91,13 +91,30 @@ export async function processNewListings() {
         extracted = await extractListing(rawRecord);
       } catch (err) {
         logError(`[pipeline] extractListing() threw for ${label}:`, err);
-        return { saved: false };
+        extracted = null;
       }
 
-      // Step b: skip if null
+      // Step b: if extraction failed, keep the listing anyway — every scraped room
+      // (with its link) must show up. We build a minimal record from the raw crawl
+      // data so the user can open and judge it themselves.
       if (extracted == null) {
-        log(`[pipeline] Extraction returned null for ${label} — skipping`);
-        return { saved: false };
+        log(`[pipeline] Extraction unavailable for ${label} — saving raw listing`);
+        extracted = {
+          location: 'unknown',
+          insideLuxembourg: true,
+          rentTotal: 'unknown',
+          availability: 'unknown',
+          domiciliationFlag: 'unknown',
+          estimatedCommute: 'unknown',
+          furnished: 'unknown',
+          smokingAllowed: 'unknown',
+          genderPolicy: 'unknown',
+          listingTitle: rawRecord.title || rawRecord.url || 'Untitled listing',
+          contactName: 'unknown',
+          contactMethod: 'unknown',
+          rawDescription: '',
+          corridor: 'unknown',
+        };
       }
 
       // Step c: analyse

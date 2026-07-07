@@ -329,18 +329,19 @@ export default function SettingsView({ onEditProfile }) {
           <button
             onClick={onEditProfile}
             style={{
-              padding: '8px 18px',
-              borderRadius: '8px',
-              border: '1px solid #7c3aed',
-              background: 'transparent',
-              color: '#c4b5fd',
-              fontSize: '13px',
-              fontWeight: '600',
+              padding: '11px 22px',
+              borderRadius: '9px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #7c3aed, #5b21b6)',
+              color: '#fff',
+              fontSize: '14px',
+              fontWeight: '700',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
+              boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
             }}
           >
-            Edit Profile
+            ✏️ Edit search profile
           </button>
         </div>
       </div>

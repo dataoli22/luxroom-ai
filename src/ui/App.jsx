@@ -40,6 +40,8 @@ export default function App() {
   // Onboarding state: null = loading, false = not done, true = done
   const [onboardingDone, setOnboardingDone] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [editProfileData, setEditProfileData] = useState(null)
   const [showModels, setShowModels] = useState(false)
   const [showFirstRun, setShowFirstRun] = useState(false)
   const [aiConfigured, setAiConfigured] = useState(null) // null=checking, true/false
@@ -171,8 +173,21 @@ export default function App() {
     checkAi()
   }
 
-  const handleEditProfile = () => {
+  const handleEditProfile = async () => {
+    // Load the current profile so edits don't wipe existing settings, then open
+    // the profile-only customisation wizard (no AI setup — that has its own gate).
+    try {
+      const s = await window.luxroom?.settings.get()
+      setEditProfileData(s?.profile || {})
+    } catch { setEditProfileData({}) }
+    setEditingProfile(true)
     setShowOnboarding(true)
+  }
+
+  const handleEditComplete = async (profile) => {
+    setShowOnboarding(false)
+    setEditingProfile(false)
+    setEditProfileData(null)
     setTab('settings')
   }
 
@@ -185,9 +200,11 @@ export default function App() {
     )
   }
 
-  // Onboarding wizard
+  // Onboarding wizard (first run) or profile editing (no AI gate)
   if (showOnboarding) {
-    return <OnboardingView onComplete={handleOnboardingComplete} />
+    return editingProfile
+      ? <OnboardingView onComplete={handleEditComplete} editMode initialProfile={editProfileData} />
+      : <OnboardingView onComplete={handleOnboardingComplete} />
   }
 
   return (

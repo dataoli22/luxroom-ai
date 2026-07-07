@@ -1,11 +1,11 @@
 {
   "name": "luxroom-ai",
-  "version": "1.9.6",
+  "version": "1.9.7",
   "description": "Open-source automated housing agent for Luxembourg — find your room before September.",
   "main": "electron/main.bundle.js",
   "scripts": {
     "build:main": "esbuild electron/main.js --bundle --platform=node --target=node20 --external:electron --external:nodemailer --external:electron-updater --outfile=electron/main.bundle.js",
-    "pw:install": "cross-env PLAYWRIGHT_BROWSERS_PATH=./pw-browsers playwright install chromium",
+    "pw:install": "cross-env PLAYWRIGHT_BROWSERS_PATH=./pw-browsers playwright install chromium && node -e \"const fs=require('fs'),p=require('path');const d='./pw-browsers';try{for(const f of fs.readdirSync(d))if(/^chromium_headless_shell/.test(f)){fs.rmSync(p.join(d,f),{recursive:true,force:true});console.log('trimmed',f)}}catch(e){}\"",
     "dev": "npm run build:main && concurrently \"vite\" \"wait-on http://localhost:5173 && node launch-electron.cjs\"",
     "build": "npm run build:main && npm run pw:install && vite build && electron-builder --win",
     "build:mac": "npm run build:main && npm run pw:install && vite build && electron-builder --mac",

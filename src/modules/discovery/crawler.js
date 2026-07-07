@@ -874,8 +874,9 @@ export const SOURCES = [
 //                     MyResidHome, RoomieRadar
 //   dead domain/cert: LogementPourEtudiants, RechercheColocation
 //   timeout:          FreeRentAds
-//   Cloudflare:       Wortimmo, Roomlala (managed challenge loops even with a
-//                     real browser — needs an undetected driver we don't bundle)
+//   Cloudflare Turnstile (interactive CAPTCHA): Wortimmo, Roomlala. Tested and
+//     UNBEATABLE for free — full Chromium (headed too), rebrowser (undetected
+//     CDP) and Botasaurus all fail. Only a PAID CAPTCHA-solving service works.
 //   JS challenge:     Uniplaces
 //   wrong country:    Immoweb (Belgian province, not the Grand Duchy)
 // Working: Appartager (login), Athome, Immotop (full-Chromium beats DataDome),

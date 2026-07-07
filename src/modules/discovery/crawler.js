@@ -148,7 +148,7 @@ ${stripped}`;
  * Common cookie / GDPR banner patterns across European sites.
  * Tries each selector silently — no error if not found.
  */
-async function dismissCookieBanner(page) {
+export async function dismissCookieBanner(page) {
   const candidates = [
     // text-based (most reliable)
     'button:has-text("Accept all")',
@@ -825,6 +825,24 @@ export const SOURCES = [
   },
 ];
 
+// Sources that a health check (test-sources.mjs, 2026-07) showed to be dead or
+// unreachable, so we skip them at crawl time to keep scans fast and productive.
+// Kept in SOURCES (not deleted) so they're easy to revive once fixed.
+//   404 / wrong URL:  Immotop, Loft68, LuxMill, ImmoJeune, LuxFriends,
+//                     JustArrived, MyResidHome, RoomieRadar
+//   dead domain/cert: LogementPourEtudiants, RechercheColocation
+//   timeout:          FreeRentAds
+//   bot-blocked 403:  Roomlala, Wortimmo    (need anti-bot handling)
+//   JS challenge:     Uniplaces
+//   wrong country:    Immoweb (Belgian province, not the Grand Duchy)
+// Working: Appartager (login), Athome, VaubanFort, HousingAnywhere, Spotahome.
+const SKIPPED_SOURCES = new Set([
+  'Immotop', 'Roomlala', 'LogementPourEtudiants', 'Loft68', 'LuxMill',
+  'FreeRentAds', 'ImmoJeune', 'LuxFriends', 'RechercheColocation', 'JustArrived',
+  'MyResidHome', 'RoomieRadar', 'Wortimmo', 'Uniplaces', 'Immoweb',
+]);
+const ACTIVE_SOURCES = SOURCES.filter(s => !SKIPPED_SOURCES.has(s.name));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -1037,14 +1055,16 @@ function withTimeout(promise, ms, msg) {
  * every source. Each source is capped by SOURCE_TIMEOUT_MS so one slow site can't
  * stall the whole scan.
  */
-export async function crawlAll(onSourceRecords) {
+export async function crawlAll(onSourceRecords, onSourceDone) {
   await db.initDb();
 
   const browser        = await chromium.launch({ headless: true });
   const allNewRecords  = [];
+  const total          = ACTIVE_SOURCES.length;
+  let   done           = 0;
 
   try {
-    await mapLimit(SOURCES, 3, async (sourceConfig) => {
+    await mapLimit(ACTIVE_SOURCES, 3, async (sourceConfig) => {
       console.log(`\n[crawler] Starting source: ${sourceConfig.name}`);
       try {
         const records = await withTimeout(
@@ -1060,6 +1080,11 @@ export async function crawlAll(onSourceRecords) {
         }
       } catch (err) {
         console.error(`[crawler] Error in source ${sourceConfig.name}: ${err.message}`);
+      } finally {
+        done++;
+        if (typeof onSourceDone === 'function') {
+          try { onSourceDone(done, total, sourceConfig.name); } catch {}
+        }
       }
     });
   } finally {

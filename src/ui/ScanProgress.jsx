@@ -42,6 +42,7 @@ export default function ScanProgress({ initial }) {
     ? fmt(((p.total - p.current) / ratePerSec) * 1000)
     : null
 
+  const sites = p.sourcesTotal > 0 ? `${p.sourcesDone}/${p.sourcesTotal} sites` : null
   const label = p.phase === 'crawling'
     ? 'Crawling housing sites…'
     : `Analysing listings`
@@ -77,6 +78,7 @@ export default function ScanProgress({ initial }) {
         {analysing && (
           <span style={{ color: c.text, fontWeight: 600 }}>{p.current} / {p.total} <span style={{ color: c.sub, fontWeight: 400 }}>({pct}%)</span></span>
         )}
+        {sites && p.sourcesDone < p.sourcesTotal && <span>🌐 {sites}</span>}
         <span>⏱ {fmt(elapsed)}</span>
         {eta && <span>ETA ~{eta}</span>}
         {ratePerSec > 0 && <span>{ratePerSec >= 1 ? `${ratePerSec.toFixed(1)}/s` : `${Math.round(ratePerSec * 60)}/min`}</span>}

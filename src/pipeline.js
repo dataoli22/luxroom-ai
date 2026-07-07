@@ -34,6 +34,8 @@ let _scanPhase = 'idle';     // 'idle' | 'crawling' | 'analysing'
 let _scanCurrent = 0;
 let _scanTotal = 0;
 let _scanStartedAt = null;
+let _scanSourcesDone = 0;
+let _scanSourcesTotal = 0;
 
 function emitScanProgress() {
   scanEmitter.emit('progress', {
@@ -41,6 +43,8 @@ function emitScanProgress() {
     current: _scanCurrent,
     total: _scanTotal,
     startedAt: _scanStartedAt,
+    sourcesDone: _scanSourcesDone,
+    sourcesTotal: _scanSourcesTotal,
   });
 }
 
@@ -48,6 +52,7 @@ export function getPipelineStatus() {
   return {
     running: _running, lastCrawl: _lastCrawl, listingCount: _listingCount, scanCycles: _scanCycles,
     scanPhase: _scanPhase, scanCurrent: _scanCurrent, scanTotal: _scanTotal, scanStartedAt: _scanStartedAt,
+    scanSourcesDone: _scanSourcesDone, scanSourcesTotal: _scanSourcesTotal,
   };
 }
 
@@ -63,6 +68,8 @@ export async function processNewListings() {
   _scanPhase = 'crawling';
   _scanCurrent = 0;
   _scanTotal = 0;
+  _scanSourcesDone = 0;
+  _scanSourcesTotal = 0;
   _scanStartedAt = Date.now();
   emitScanProgress();
   log(`[pipeline] Starting crawl — ${new Date().toISOString()}`);
@@ -202,9 +209,15 @@ export async function processNewListings() {
       });
     };
 
+    const onSourceDone = (sourcesDone, sourcesTotal) => {
+      _scanSourcesDone = sourcesDone;
+      _scanSourcesTotal = sourcesTotal;
+      emitScanProgress();
+    };
+
     let crawledTotal = 0;
     try {
-      const all = await crawlAll(onSourceRecords);
+      const all = await crawlAll(onSourceRecords, onSourceDone);
       crawledTotal = all.length;
     } catch (err) {
       logError('[pipeline] crawlAll() failed:', err);

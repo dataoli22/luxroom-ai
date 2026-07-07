@@ -1,20 +1,22 @@
 # LuxRoom AI
 
-> Automated housing search for Luxembourg — finds listings, scores them, and drafts outreach messages to landlords in their own language. Runs entirely on your laptop. Free, open source, nothing leaves your device.
+> Your automated housing assistant for Luxembourg. It watches the housing sites for you, scores each room against what you want, and even drafts a message to the landlord in their own language. Runs on your laptop, free.
 
-Built for international students arriving in Luxembourg who need to find a room fast and don't speak French or German well enough to write convincing emails.
+Made for international students arriving in Luxembourg who need a room fast — and don't want to refresh a dozen websites every day or write emails in French and German.
+
+> 📖 **Also read:** [The Complete Student Housing Guide](STUDENT_HOUSING_GUIDE.md) — Facebook & WhatsApp groups, university housing, scam warnings, budgets, and everything LuxRoom AI *can't* reach for you.
 
 ---
 
 ## What it does
 
-1. **Crawls** housing sites every 3 hours looking for new listings that match your criteria
-2. **Scores** each listing 0–10 based on price, location, commute distance, availability date, and your preferences
-3. **Drafts** an outreach message in the language the landlord used (French, German, Luxembourgish, or English) — automatically
-4. **Notifies** you via email and a live in-app dashboard when a high-scoring listing appears
-5. **Waits for your approval** before sending anything — or auto-sends if you enable Away Mode
+1. **Watches** housing sites around the clock and finds new rooms that fit your budget, area, and commute.
+2. **Scores** each one out of 10 so you only look at the good ones.
+3. **Drafts** a polite message to the landlord — in the language *they* used (French, German, Luxembourgish, or English).
+4. **Alerts** you (desktop + email) the moment a great match appears.
+5. **Waits for your OK** before anything is sent. You're always in control.
 
-You set it up once. It runs in the background. You only look at the listings worth your time.
+Set it up once. It runs quietly in the background — even when the window is closed — as long as your laptop is on.
 
 ---
 
@@ -22,266 +24,133 @@ You set it up once. It runs in the background. You only look at the listings wor
 
 👉 **[Go to the latest release →](../../releases/latest)**
 
-Pick your file:
-
 | Your computer | How to get it |
 |---|---|
-| 🪟 Windows (any modern PC) | Download `LuxRoom-AI-Windows.exe` from [Releases](../../releases/latest) |
-| 🍎 Mac (Apple Silicon or Intel) | Build the app once on your Mac — see [macOS](#macos) below |
-
-> **Why no pre-built Mac download?** A pre-built Mac app must be signed with a paid Apple Developer certificate to run smoothly. Instead, Mac users build the app locally in one command (below) — it produces a `.zip` of the app on your own device. It only takes a couple of minutes, once.
-
----
+| 🪟 **Windows** | Download **`LuxRoom-AI-Windows.exe`** and run it |
+| 🍎 **Mac** | Build it once on your Mac — see [macOS](#macos) below |
 
 ### Windows
 
-1. Download the `.exe` and double-click it
-2. If Windows asks *"Do you want to allow this app to make changes?"* — click **Yes**
-3. Follow the installer prompts (takes under a minute)
-4. Open **LuxRoom AI** from the Start menu or desktop shortcut
-5. Fill in the 3-field setup (name, email, app password) — done in under 2 minutes
-6. The app automatically installs Ollama and downloads an AI model in the background — takes 2–5 minutes the first time, then instant on every launch after
-
-> **"Windows protected your PC" — SmartScreen warning**
->
-> You'll see a blue screen saying *"Microsoft Defender SmartScreen prevented an unrecognized app from starting."* This is normal for any open-source app that hasn't paid ~$300/year for a Microsoft code-signing certificate. It does **not** mean the app is malicious.
->
-> Click **"More info"** → **"Run anyway"** to proceed. You only see this once.
-
----
+1. Download **`LuxRoom-AI-Windows.exe`** and double-click it.
+2. If you see a blue **"Windows protected your PC"** screen, click **More info → Run anyway**. (This is normal for free apps that haven't paid for a Microsoft certificate — it's not a virus.)
+3. Follow the installer, then open **LuxRoom AI** from the Start menu.
+4. Do the quick setup (below). That's it.
 
 ### macOS
 
-You build the app once on your own Mac. You need [Node.js 20+](https://nodejs.org) installed (one-time).
+Macs need the app to be built once on your own machine (a pre-built Mac app requires a paid Apple certificate). It takes about two minutes. You need [Node.js](https://nodejs.org) installed first (a one-time, one-click install).
 
-1. Download the source: on the repo page click **Code → Download ZIP**, then unzip it (or `git clone` it)
-2. Open **Terminal**, go into the folder, and run:
-   ```bash
+1. On the [repository page](../../), click **Code → Download ZIP**, and unzip it.
+2. Open the **Terminal** app, drag the unzipped folder onto it (to move into it), press Enter, then run:
+   ```
    npm install
    npm run build:mac
    ```
-3. This creates **LuxRoom AI.app** inside the `release/` folder (also zipped as `LuxRoom-AI-Mac-AppleSilicon.zip`)
-4. Drag **LuxRoom AI.app** into your **Applications** folder
-5. **Right-click (or Control-click) the app → Open → Open** the first time (a normal double-click is blocked for unsigned apps)
-6. Fill in the 3-field setup (name, email, app password), and the app installs Ollama + a model in the background
+3. Open the new **`release`** folder → drag **LuxRoom AI.app** into your **Applications**.
+4. **Right-click** the app → **Open** → **Open** (needed the first time only).
 
-> **Prefer not to build? Just run it from source:**
-> ```bash
-> npm install
-> npm run dev
-> ```
-> This launches the app directly — no packaging needed.
+> If macOS says the app is *"damaged"*, open Terminal and run `xattr -cr "/Applications/LuxRoom AI.app"`, then open it again.
 
-> **macOS security warning — "damaged" or "unidentified developer"**
+---
+
+## First-time setup
+
+The first time you open LuxRoom AI, a short setup takes you through three things.
+
+### 1. About you (under 2 minutes)
+
+| Field | What to enter |
+|---|---|
+| **Your first name** | Used to sign the messages, e.g. *"Best regards, Priya"* |
+| **Your email address** | Your Gmail/Outlook/etc. — the app auto-configures the rest |
+| **Email password** | An **App Password** (see below), so the app can send you alerts |
+
+> **What's an "App Password"?** Most email providers won't let apps use your normal password. Instead you create a separate one just for this app. LuxRoom AI shows a direct link to the right page the moment it recognises your email. It's free and takes a minute.
 >
-> Because the app isn't signed with a paid Apple certificate, the **right-click → Open** step above is needed the first time. If you ever see **"LuxRoom AI is damaged and can't be opened"**, run:
-> ```bash
-> xattr -cr "/Applications/LuxRoom AI.app"
-> ```
-> then open it again. Or: **System Settings → Privacy & Security → Open Anyway**.
->
-> If neither works: go to **System Settings → Privacy & Security** → scroll to Security → click **Open Anyway**.
+> | Provider | Where to make one |
+> |---|---|
+> | Gmail | myaccount.google.com/apppasswords |
+> | Outlook / Hotmail | your normal password (or an App Password if 2-factor is on) |
+> | Yahoo | login.yahoo.com/account/security |
+> | iCloud | appleid.apple.com |
+
+There's a **Send test email** button — use it to confirm your email works before continuing.
+
+### 2. Set up the AI (required)
+
+LuxRoom needs an AI to read and rank listings. You'll see a setup screen with two choices — **pick either one, both are free:**
+
+- **☁️ Cloud (recommended, fastest).** Paste a free key from **Groq** or **Ollama Cloud** — a one-minute sign-up, no credit card. The AI runs on their servers, so it's fast and doesn't slow your laptop. *(This is the easiest option, especially on older laptops.)*
+- **💻 On your device.** Click a model to download — the app installs and runs everything itself, **no terminal or commands needed**. Private and works offline, but slower.
+
+You can't miss this step — the app won't start scanning until the AI is ready. You can switch options any time later.
+
+### 3. Connect Appartager (optional, recommended)
+
+Appartager is one of the best room sources but only shows listings to members. Click **Connect**, log in once in the window that opens, and LuxRoom AI will search it for you from then on.
+
+> Want to fine-tune your budget, areas, or housing type? Click **"Customise everything →"** on the setup screen for the full wizard.
 
 ---
 
-## Setup
+## Using the app
 
-The first time you open LuxRoom AI you'll see a quick setup screen — 3 fields, done in under 2 minutes.
+**Your first scan.** After setup, a prompt invites you to run your first scan. Click it — the first one takes **10–20 minutes** (it checks many sites and reads each listing). You'll see a live progress bar with a timer.
 
-**Field 1 — Your first name**
-Used to sign outreach messages: *"Best regards, Priya"*
+**It runs by itself after that.** LuxRoom scans automatically every few hours in the background — even when the window is closed — as long as your laptop is on. You'll get a desktop notification the moment a good match appears. Close the window any time; it keeps running in your system tray. To quit fully, right-click the tray icon → Quit.
 
-**Field 2 — Your email address**
-Paste your Gmail, Outlook, Yahoo, or other address. The app auto-detects your provider and configures SMTP automatically — no settings to fill in.
+**Run it whenever you like.** Click **Run Now** (top right) for an instant scan, or use the little **"Every 6h ▾"** menu next to it to change how often it runs automatically.
 
-**Field 3 — Email password / App Password**
+**The tabs:**
+- **🏠 Listings** — every match, newest and best-scored first. Click a card to open it in your browser. The bar at the top shows which AI is analysing and lets you change it.
+- **✉️ Approvals** — draft messages waiting for your OK. Edit the text if you like, then **Approve & Send** (or Discard). You can also approve straight from the email alert.
+- **📋 Log** — a live view of what the app is doing and a countdown to the next scan.
+- **⚙️ Settings** — change your profile, email, AI provider, scan frequency, and more.
+- **❓ Help** — step-by-step tips and FAQs inside the app.
 
-Most email providers require an *App Password* — a separate password for third-party apps — rather than your regular account password. The app shows a direct link to the right settings page for your provider the moment it recognises your email domain.
+**Away mode.** Going offline for a while? In the Approvals tab, turn on **Away Mode** and top listings (9–10/10) are sent automatically, so you don't miss a great room while you're busy. Turn it off any time.
 
-| Provider | What to use | Link |
-|---|---|---|
-| Gmail | App Password | myaccount.google.com/apppasswords |
-| Outlook / Hotmail | Regular password (or App Password if 2FA is on) | account.microsoft.com/security |
-| Yahoo | App Password | login.yahoo.com/account/security |
-| iCloud / me.com | App-Specific Password | appleid.apple.com |
-| ProtonMail | Requires Proton Mail Bridge running locally | proton.me/mail/bridge |
-
-After you click **Start Searching**, the app installs Ollama and downloads an AI model in the background — a one-time download of roughly 1–5 GB depending on your hardware. Subsequent launches are instant.
-
-Want to tune your budget, areas, housing type, or other preferences? Click **"Customise everything →"** below the quick setup card to access the full 7-step wizard.
+**Changing the AI later.** Click the **AI** button in the top bar (or **Configure AI** on the Listings tab) to switch between cloud and local, or download more models. Note: the **🤖 Models** button *downloads* local models to your laptop, while the **AI** panel *chooses which one actually runs*.
 
 ---
 
-## Privacy & security
+## Your privacy
 
-**Nothing leaves your device** — with the exception of two things you explicitly configure:
+LuxRoom AI runs on your machine. Nothing about you is uploaded anywhere, except the two things you set up yourself:
 
-| What | Where it goes | Can you opt out? |
-|---|---|---|
-| Listing HTML (price, location, dates extracted by AI) | Your device only — processed by local Ollama | N/A |
-| Draft outreach messages | Your device only — never sent without your approval | N/A |
-| Email alerts | Your own SMTP server (Gmail, Outlook, etc.) | Yes — skip email in setup |
-| Cloud AI key (optional) | Only the provider you chose (Groq, Together AI, etc.) | Yes — use local Ollama instead |
+- **Email alerts** go out through your own email account (Gmail, etc.) — never through us.
+- **A cloud AI key** (only if you chose one) sends the listing text to that provider to be analysed. Your name, preferences, and draft messages never leave your device.
 
-Your SMTP password and any API keys are stored in your OS user-data folder (`%APPDATA%\LuxRoom AI` on Windows). They are never transmitted to any server other than the one you explicitly chose.
-
-The in-app email approval server binds only to `127.0.0.1` — it cannot be reached from any other device on your network.
-
-The app has been audited against OWASP Electron security guidelines: `contextIsolation` is enabled, `nodeIntegration` is disabled, a strict Content Security Policy is enforced, and all IPC handlers validate their inputs.
+Your passwords and keys are stored only in your computer's private app folder. There's no tracking, no analytics, nothing phoning home.
 
 ---
 
-## Luxembourg area guide
+## Common questions
 
-Most students search only in Luxembourg City and miss dramatically cheaper options nearby.
+**Do I have to keep the app open?**
+No. It keeps scanning in the background as long as your laptop is on — even with the window closed. It lives in your system tray.
 
-### Luxembourg City
-Most convenient — walkable to everything, tram and bus well-served. The most expensive option: expect **€650–950/month** for a room. Best if your campus or office is in Kirchberg, Cloche d'Or, or the Centre.
+**Will it message landlords without asking me?**
+No — not unless you deliberately turn on **Away Mode** (and even then only for near-perfect matches). By default, every message waits for you to click Approve.
 
-### ⭐ North — CFL Line 10 (recommended for students)
-The hidden gem. CFL Line 10 runs direct trains to Luxembourg Gare → Kirchberg in **~25–35 minutes**. Towns like **Mersch**, **Lintgen**, and **Walferdange** cost **€380–580/month** — roughly half the city price — and most students don't know this option exists. The app searches here by default.
+**The message came out in the wrong language.**
+Open the listing in Approvals → **Generate new draft**, or just edit the text yourself before sending.
 
-### Suburbs & Communes
-Quiet residential communes around the city. Typically **€500–750/month** with good bus connections. Bertrange and Strassen are popular with expat families and often have furnished rooms in shared houses.
+**The AI setup won't finish / a model won't download.**
+Add a free **Groq** key in the AI setup instead — it needs no download and works instantly. (The local option needs Ollama, which the app installs for you; if that struggles on your machine, the cloud key is the easy fix.)
 
-### South — Minett / Belval
-Home to the University of Luxembourg's main campus at Belval. **€380–600/month**. Esch-sur-Alzette has a growing student scene. Only makes sense if your destination is in the south — the commute to city-centre is 35–45 minutes.
+**Nothing shows up in Listings.**
+The first scan takes 10–20 minutes — watch the progress bar. If it finishes with nothing, there may simply be no new matches right now; it'll keep checking automatically. Widening your areas or budget in Settings helps.
 
-The app's area picker groups these regions and shows price ranges and commute times for each when you hover the guide icon.
+**Can I use it outside Luxembourg?**
+The area guide is Luxembourg-specific, but you can change your city and preferred areas in Settings and it'll still work.
 
----
-
-## Approval flow
-
-Every draft message waits for your approval before anything is sent.
-
-**Manual mode (default)**
-A notification appears → open the Approvals tab → click Approve or Discard. If you configured email alerts, you also get a one-click Approve / Discard link directly in your inbox — no need to open the app.
-
-**Away mode**
-Enable this from the Approvals dashboard when you're busy or travelling. Listings scoring 9 or 10 out of 10 are sent automatically; you receive a notification after the fact. Toggle it off any time — designed for weekends or exam periods.
-
----
-
-## AI models
-
-The app uses a small language model running locally via [Ollama](https://ollama.com). After the initial download, no internet connection is needed for the AI to function.
-
-### Recommended by hardware
-
-| RAM | Model | Download size | Notes |
-|---|---|---|---|
-| < 8 GB | Use cloud API | — | Free Groq account recommended |
-| 8 GB | `llama3.2:1b` | 1.3 GB | Fast, works on most student laptops |
-| 12 GB | `llama3.2:3b` | 2.0 GB | Best quality/speed balance — **default** |
-| 16 GB+ | `llama3.1:8b` | 4.7 GB | Highest quality, slower on CPU |
-
-The onboarding wizard detects your hardware and pre-selects the right model. You can add, switch, or remove models at any time via the **🤖 Models** button in the top bar.
-
-### Cloud API (optional)
-
-If your laptop has less than 8 GB RAM, the app can use a free cloud API for the listing analysis step. Only the raw listing HTML is sent — your name, preferences, and draft messages never leave your device.
-
-Recommended: **[Groq](https://console.groq.com/keys)** — free tier, 14,400 requests/day, no credit card required.
-
----
-
-## Building from source
-
-Requires **Node.js 20+** and **Git**.
-
-```bash
-git clone https://github.com/dataoli22/luxroom-ai
-cd luxroom-ai
-npm install
-npm run dev          # opens the app in development mode with hot reload
-```
-
-**Release builds are automatic.** Push a version tag and GitHub Actions builds all three installers and attaches them to the release:
-
-```bash
-git tag v1.0.2
-git push origin v1.0.2
-# GitHub Actions produces (both built in the cloud — no Mac device needed):
-#   LuxRoom-AI-Windows.exe                (Windows, built on windows-latest)
-#   LuxRoom-AI-Mac-AppleSilicon.zip       (macOS Apple Silicon, built on macos-14)
-```
-
-**To build locally:**
-```bash
-npm run build        # Windows .exe  (run on Windows)
-npm run build:mac    # macOS .zip    (run on a Mac)
-npm run build:linux  # Linux .AppImage
-```
-
-### Project structure
-
-```
-electron/
-  main.js          App lifecycle, IPC handlers, local approval HTTP server
-  preload.js       Secure contextBridge — the only surface the renderer touches
-src/
-  ui/              React frontend (built with Vite)
-    OnboardingView.jsx   Setup wizard (fast path + full 7-step)
-    ApprovalsView.jsx    Live approvals dashboard with away-mode toggle
-    ModelManagerView.jsx Pull / switch / remove Ollama models
-    SettingsView.jsx     Post-setup configuration
-  modules/
-    discovery/     Playwright web crawler — finds new listings
-    analysis/      Opportunity scorer — rates 0–10 against your profile
-    messaging/     Draft generator — writes in the listing's language
-    notifications/ Email (Nodemailer) and desktop (node-notifier) alerts
-    hermes/        Sends approved messages to landlords
-  db/              SQLite via sql.js — stores listings, drafts, send log
-  pipeline.js      Orchestrator — runs the full cycle every 3 hours
-  hardware.js      Detects RAM/CPU/GPU and recommends a model
-  settings.js      Reads/writes settings to OS user-data folder
-launch-electron.cjs  Strips ELECTRON_RUN_AS_NODE before spawning Electron
-```
-
----
-
-## FAQ
-
-**Will this get me banned from housing sites?**
-The crawler uses Playwright (a real browser) with human-like delays between requests. It is not a mass scraper — it runs once every 3 hours and only fetches detail pages for listings that match your filters. Use it responsibly and don't reduce the crawl interval below 1 hour.
-
-**Does it actually send messages on its own?**
-Only if you enable Away Mode, and only for listings scoring 9 or 10 out of 10. In the default Manual mode, nothing is ever sent without you clicking Approve.
-
-**The message was written in the wrong language.**
-Open the listing in the Approvals tab → click "Generate new draft". Language is re-detected from the listing text. You can also edit the draft directly before approving.
-
-**Ollama won't start / "model not found".**
-Open **🤖 Models** in the top bar — it shows all installed models and lets you re-download. Make sure Ollama is running: open a terminal and run `ollama serve`.
-
-**Can I use this outside Luxembourg?**
-The area picker and commute guide are Luxembourg-specific, but the core pipeline works for any city. Change your city in Settings → Profile and update your preferred areas.
-
-**The Windows installer shows a SmartScreen warning.**
-See the [note in the installation section](#windows) above — this is expected for unsigned open-source installers. Click "More info" → "Run anyway".
-
-**macOS says "damaged and can't be opened" or "unidentified developer".**
-Open Terminal and run: `xattr -cr "/Applications/LuxRoom AI.app"` then try again. See the full [macOS install note](#macos) for all options.
-
----
-
-## Contributing
-
-Pull requests are welcome. A few ground rules:
-
-- **Preserve the privacy guarantee.** Any new network call must go only to a URL the user explicitly configured. No telemetry, no analytics, no phoning home.
-- **Test both inference modes** — local Ollama and cloud API — before submitting.
-- **Keep onboarding fast.** The quick-setup path (3 fields) is the primary experience for students. Don't add required fields to it.
-
-To report a bug or suggest a feature, open an issue on GitHub.
+**Something else?** Open the **❓ Help** tab in the app, or [report an issue on GitHub](../../issues).
 
 ---
 
 ## License
 
-MIT — free to use, modify, and distribute. See [LICENSE](LICENSE).
+Free and open source under the [MIT License](LICENSE) — use it, share it, no strings attached.
 
----
-
-*Built with [Electron](https://electronjs.org) · [React](https://react.dev) · [Vite](https://vitejs.dev) · [Ollama](https://ollama.com) · [Playwright](https://playwright.dev) · [Nodemailer](https://nodemailer.com) · [sql.js](https://sql.js.org)*
+*Not affiliated with any housing website. Please use it responsibly and be a good tenant.* 🏡

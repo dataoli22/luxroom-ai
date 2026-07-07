@@ -125,7 +125,8 @@ function Field({ label, helper, children, fullWidth }) {
   );
 }
 
-export default function SettingsView({ onEditProfile }) {
+export default function SettingsView({ onEditProfile, onConfigureAi, onOpenModels, aiProvider }) {
+  const [showAdvancedAi, setShowAdvancedAi] = useState(false);
   const [form, setForm] = useState({
     aiProvider: 'auto',
     anthropicApiKey: '',
@@ -350,7 +351,46 @@ export default function SettingsView({ onEditProfile }) {
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>AI &amp; Analysis</div>
 
-        <p style={{ color: '#7a7a9a', fontSize: 13, margin: '0 0 14px', lineHeight: 1.6 }}>
+        {/* Primary path — the AI setup lives in its own panel (the same one used by
+            the first-run gate). Settings just points to it, so there's one source
+            of truth. Downloads live in the Models tab; guidance in the cookbook. */}
+        <div style={{
+          background: '#12102a', border: '1px solid #2a2060', borderRadius: 10,
+          padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
+        }}>
+          <div>
+            <div style={{ color: '#e8e8f0', fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
+              AI is managed in the AI panel
+            </div>
+            <div style={{ color: '#8080a8', fontSize: 13, lineHeight: 1.5 }}>
+              {aiProvider
+                ? <>Currently analysing with <span style={{ color: '#c4b5fd', fontWeight: 600 }}>{({ groq: 'Groq', 'ollama-cloud': 'Ollama Cloud', gemini: 'Gemini', openai: 'OpenAI', anthropic: 'Claude', ollama: 'Local Ollama', hermes: 'Hermes' })[aiProvider] || aiProvider}</span>.</>
+                : 'Pick a free cloud key or a local model.'}
+            </div>
+          </div>
+          <button onClick={onConfigureAi} style={{
+            padding: '10px 20px', borderRadius: 9, border: 'none',
+            background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', color: '#fff',
+            fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+            boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
+          }}>⚙️ Configure AI</button>
+        </div>
+
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>
+          <button onClick={onOpenModels} style={linkBtnStyle}>🤖 Manage local models →</button>
+          <button onClick={() => window.luxroom?.shell?.openExternal('https://github.com/dataoli22/luxroom-ai/blob/master/AI_MODELS_GUIDE.md')}
+            style={linkBtnStyle}>📖 AI models — playground &amp; cookbook →</button>
+        </div>
+
+        <button onClick={() => setShowAdvancedAi(v => !v)} style={{
+          background: 'none', border: 'none', color: '#6a6a8a', fontSize: 12.5,
+          cursor: 'pointer', padding: '14px 0 0', textDecoration: 'underline',
+        }}>
+          {showAdvancedAi ? 'Hide advanced provider settings' : 'Advanced provider settings (paid / custom keys) →'}
+        </button>
+
+        {showAdvancedAi && (<>
+        <p style={{ color: '#7a7a9a', fontSize: 13, margin: '16px 0 14px', lineHeight: 1.6 }}>
           Choose who analyses each listing. <span style={{ color: '#6ee7b7' }}>Local (Ollama / Hermes)</span> runs on your
           laptop for free. <span style={{ color: '#6ee7b7' }}>Groq and Gemini</span> have generous free tiers.
           Anthropic and OpenAI are paid per listing.
@@ -507,9 +547,11 @@ export default function SettingsView({ onEditProfile }) {
             </div>
           </div>
         )}
+        </>)}
       </div>
 
-      {/* Section 2 — Local Extraction */}
+      {/* Section 2 — Local Extraction (advanced) */}
+      {showAdvancedAi && (
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>Local Extraction (Ollama)</div>
         <div style={gridStyle}>
@@ -549,14 +591,12 @@ export default function SettingsView({ onEditProfile }) {
               style={linkBtnStyle}>Get your free Ollama key →</button>
           </div>
           <div style={infoBoxStyle}>
-            Ollama runs locally on your CPU. Install from{' '}
-            <span style={{ color: '#8b5cf6' }}>ollama.com</span>, then run:{' '}
-            <code style={{ background: '#1a1a2e', padding: '2px 6px', borderRadius: '4px', color: '#c4b5fd' }}>
-              ollama pull qwen2.5-vl
-            </code>
+            LuxRoom installs and runs Ollama for you — no terminal needed. These fields are for advanced users
+            who run their own Ollama server or want to override the model.
           </div>
         </div>
       </div>
+      )}
 
       {/* Section 2b — Connected Accounts */}
       <div style={sectionStyle}>

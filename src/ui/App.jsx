@@ -311,7 +311,7 @@ export default function App() {
         {tab === 'listings' && <ListingsView status={status} aiProvider={aiProvider} onConfigureAi={() => setShowAiSetup(true)} />}
         {tab === 'approvals' && <ApprovalsView />}
         {tab === 'log' && <LogView status={status} scanInterval={scanInterval} />}
-        {tab === 'settings' && <SettingsView onEditProfile={handleEditProfile} />}
+        {tab === 'settings' && <SettingsView onEditProfile={handleEditProfile} onConfigureAi={() => setShowAiSetup(true)} onOpenModels={() => setShowModels(true)} aiProvider={aiProvider} />}
         {tab === 'help' && <HelpView />}
       </div>
 

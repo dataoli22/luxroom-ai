@@ -652,20 +652,11 @@ export default function OnboardingView({ onComplete, editMode = false, initialPr
       }
       await window.luxroom?.settings.save(payload)
 
-      // For local mode, run the install/pull phase before entering the app.
-      // Skipped when editing an existing profile or finishing the customisation
-      // wizard — the AI is set up separately in its dedicated gate.
-      if (inferenceMode === 'local' && !editMode && !skipInstall) {
-        const steps = [
-          { id: 'ollama', label: 'Install Ollama', status: 'pending', detail: '' },
-          localModel ? { id: 'pull',   label: `Download model — ${localModel}`, status: 'pending', detail: '' } : null,
-        ].filter(Boolean)
-        setInstallSteps(steps)
-        setInstalling(true)
-        runInstall(steps, finalProfile)
-      } else {
-        onComplete(finalProfile)
-      }
+      // No local install here. AI setup — cloud key (recommended) or an optional
+      // local download — is handled entirely by the mandatory AI gate that appears
+      // right after this. Local models are the last-resort fallback, never a forced
+      // multi-GB download during onboarding.
+      onComplete(finalProfile)
     } finally {
       setSaving(false)
     }
@@ -943,7 +934,7 @@ const FAST_PRESETS_DISPLAY = [
   { icon: '💶', label: '€750 / month budget' },
   { icon: '🚌', label: '60 min max commute' },
   { icon: '🌍', label: 'Outreach in landlord\'s language (auto)' },
-  { icon: '🖥️', label: 'AI runs locally on your device' },
+  { icon: '🧠', label: 'You pick the AI in the next step' },
 ]
 
 function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inferenceMode, localModel, ollamaApiKey, setOllamaApiKey, onCustomise, onFinish, saving }) {
@@ -1196,16 +1187,17 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 16 }}>🧠</span>
-                <span style={{ color: '#c4b5fd', fontWeight: 700, fontSize: 13 }}>How the AI works — nothing to set up now</span>
+                <span style={{ color: '#c4b5fd', fontWeight: 700, fontSize: 13 }}>How the AI works — you'll pick it next</span>
               </div>
               <div style={{ color: '#9090b8', fontSize: 12.5, lineHeight: 1.65, marginBottom: 10 }}>
-                An AI reads every listing and ranks it for you. There are three ways to run it — we've already
-                picked the free one, so you can just click below. Switch anytime in <strong style={{ color: '#c4b5fd' }}>Settings → AI &amp; Analysis</strong>.
+                An AI reads every listing and ranks it for you. Right after this you'll choose one — no big
+                download unless you want it. A <strong style={{ color: '#c4b5fd' }}>free cloud key</strong> is
+                recommended and takes seconds. Switch anytime later.
               </div>
               {[
-                { icon: '🆓', tag: 'Set up for you', tagColor: '#6ee7b7', title: 'On your laptop', desc: 'Free & private. We download a small AI model automatically — no signup, works offline.' },
-                { icon: '⚡', tag: 'Optional', tagColor: '#a78bfa', title: 'Free cloud (Groq / Gemini)', desc: 'Faster if your laptop is slow. Needs a free key — a 2-minute signup, no credit card.' },
-                { icon: '💎', tag: 'Optional', tagColor: '#f0a868', title: 'Paid (Anthropic / OpenAI)', desc: 'Top quality, a small cost per listing. Add your key in Settings if you want it.' },
+                { icon: '⚡', tag: 'Recommended', tagColor: '#6ee7b7', title: 'Free cloud (Groq / Ollama Cloud)', desc: 'Fastest, doesn\'t use your laptop\'s power. A free key — 1-minute signup, no credit card.' },
+                { icon: '💻', tag: 'Optional', tagColor: '#a78bfa', title: 'On your laptop', desc: 'Free & private, works offline. Downloads a model — only if you choose it. Slower on older laptops.' },
+                { icon: '💎', tag: 'Optional', tagColor: '#f0a868', title: 'Paid (Anthropic / OpenAI)', desc: 'Top quality, a small cost per listing. Add your key in Settings → Advanced if you want it.' },
               ].map(o => (
                 <div key={o.title} style={{ display: 'flex', gap: 9, alignItems: 'flex-start', marginTop: 8 }}>
                   <span style={{ fontSize: 14, flexShrink: 0, lineHeight: 1.4 }}>{o.icon}</span>
@@ -1220,23 +1212,6 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
               ))}
             </div>
 
-            {/* AI status pill */}
-            {hwDone && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                background: '#0d0d1a', border: `1px solid ${c.border}`,
-                borderRadius: 7, padding: '9px 12px',
-              }}>
-                <span style={{ fontSize: 13 }}>🧠</span>
-                <div style={{ flex: 1, fontSize: 12, color: '#7a7a9a' }}>
-                  {hw
-                    ? <>Your setup: <span style={{ color: localModel ? '#c4b5fd' : c.sub }}>{localModel || 'auto-selected model'}</span> · free, runs locally on your device</>
-                    : <>Your setup: Ollama (free, local) installs automatically after setup</>
-                  }
-                </div>
-              </div>
-            )}
-
             <button
               onClick={onFinish}
               disabled={!canGo || saving}
@@ -1249,7 +1224,7 @@ function FastSetup({ profile, setProfile, emailCfg, setEmailCfg, hw, hwDone, inf
                 boxShadow: canGo && !saving ? '0 4px 20px rgba(124,58,237,0.4)' : 'none',
                 transition: 'all 0.15s', marginTop: 4,
               }}
-            >{saving ? 'Setting up…' : '🚀 Start Searching'}</button>
+            >{saving ? 'Setting up…' : '🚀 Continue to AI setup →'}</button>
 
           </div>
         </div>

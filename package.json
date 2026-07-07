@@ -1,6 +1,6 @@
 {
   "name": "luxroom-ai",
-  "version": "1.9.10",
+  "version": "1.9.11",
   "description": "Open-source automated housing agent for Luxembourg — find your room before September.",
   "main": "electron/main.bundle.js",
   "scripts": {

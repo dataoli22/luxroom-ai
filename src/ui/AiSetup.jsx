@@ -42,6 +42,7 @@ export default function AiSetup({ blocking, onDone, onClose }) {
   const [keyMsg, setKeyMsg] = useState('')
   const [pull, setPull] = useState(null) // { model, pct, msg, error, done }
   const [showGuide, setShowGuide] = useState(false)
+  const [showLocalWarn, setShowLocalWarn] = useState(false) // warn before entering local
 
   const refresh = () => window.luxroom?.ai?.status().then(setStatus).catch(() => {})
   useEffect(() => { refresh(); const id = setInterval(refresh, 4000); return () => clearInterval(id) }, [])
@@ -101,8 +102,8 @@ export default function AiSetup({ blocking, onDone, onClose }) {
     } finally { unsub?.() }
   }
 
-  const tabBtn = (id, label) => (
-    <button onClick={() => setMode(id)} style={{
+  const tabBtn = (id, label, onClick) => (
+    <button onClick={onClick || (() => setMode(id))} style={{
       flex: 1, padding: '10px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700,
       border: `1px solid ${mode === id ? c.accent : c.border}`,
       background: mode === id ? '#1e1633' : 'transparent',
@@ -112,6 +113,39 @@ export default function AiSetup({ blocking, onDone, onClose }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001, padding: 20 }}>
+
+      {/* Warning shown before entering the local tab — the user must read & close it. */}
+      {showLocalWarn && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10002, padding: 20 }}>
+          <div style={{ background: c.panel, border: '1px solid #5a4400', borderRadius: 16, maxWidth: 440, width: '100%', padding: '26px 28px', boxShadow: '0 24px 70px rgba(0,0,0,0.65)' }}>
+            <div style={{ fontSize: 30, marginBottom: 10 }}>⚠️</div>
+            <h3 style={{ margin: '0 0 10px', fontSize: 18, fontWeight: 800, color: c.text }}>Before you choose local AI</h3>
+            <p style={{ margin: '0 0 14px', fontSize: 13.5, color: '#b8b8c8', lineHeight: 1.65 }}>
+              Running the AI on your own device means a <strong style={{ color: '#fbbf24' }}>one-time download of about 4.7 GB</strong> (Ollama + the Hermes model). A few things to know:
+            </p>
+            <ul style={{ margin: '0 0 16px', paddingLeft: 18, fontSize: 13, color: '#9090b8', lineHeight: 1.7 }}>
+              <li>The app installs and runs everything for you — <strong>no terminal needed</strong>.</li>
+              <li>It can take <strong>several minutes</strong> and needs the space + a decent connection.</li>
+              <li>Analysis is <strong>slower</strong> (runs on your CPU) and works best with 16 GB RAM.</li>
+              <li>You <strong>must finish the download to continue</strong> — there's no half-setup.</li>
+            </ul>
+            <div style={{ background: '#0d1a0d', border: '1px solid #1a4a1a', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: c.greenDim, lineHeight: 1.55, marginBottom: 18 }}>
+              Prefer to skip all this? The <strong>☁️ Cloud</strong> option is faster, free, and needs no download.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => { setShowLocalWarn(false); setMode('local') }}
+                style={{ flex: 1, padding: '12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                I understand — continue
+              </button>
+              <button onClick={() => setShowLocalWarn(false)}
+                style={{ padding: '12px 18px', borderRadius: 8, border: `1px solid ${c.border}`, background: 'transparent', color: c.sub, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                Use cloud instead
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ background: c.panel, border: `1px solid ${c.border}`, borderRadius: 16, maxWidth: 560, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '26px 30px', boxShadow: '0 24px 70px rgba(0,0,0,0.6)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div>
@@ -138,7 +172,7 @@ export default function AiSetup({ blocking, onDone, onClose }) {
         {/* Mode tabs */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           {tabBtn('cloud', '☁️ Cloud — fast (recommended)')}
-          {tabBtn('local', '💻 On my device (fallback)')}
+          {tabBtn('local', '💻 On my device (fallback)', () => { if (mode !== 'local') setShowLocalWarn(true) })}
         </div>
 
         {mode === 'cloud' && (

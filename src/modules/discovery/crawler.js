@@ -19,6 +19,8 @@ import 'dotenv/config';
 import { chromium } from 'playwright';
 import crypto from 'crypto';
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import fetch from 'node-fetch';
 import * as db from '../../db/database.js';
 import { getSettings } from '../../settings.js';
@@ -47,6 +49,35 @@ const EXTRA_HEADERS = {
   'sec-ch-ua-platform': '"Windows"',
   'Upgrade-Insecure-Requests': '1',
 };
+
+// Resolve the FULL Chromium binary (not the headless shell). Full Chromium in
+// new-headless mode passes DataDome (e.g. Immotop) where the shell is blocked.
+// Returns null → Playwright falls back to its default browser.
+function playwrightBrowsersDir() {
+  if (process.env.PLAYWRIGHT_BROWSERS_PATH) return process.env.PLAYWRIGHT_BROWSERS_PATH;
+  const home = os.homedir();
+  if (process.platform === 'win32') return path.join(process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local'), 'ms-playwright');
+  if (process.platform === 'darwin') return path.join(home, 'Library', 'Caches', 'ms-playwright');
+  return path.join(home, '.cache', 'ms-playwright');
+}
+let _fullChromium;
+function fullChromiumPath() {
+  if (_fullChromium !== undefined) return _fullChromium;
+  _fullChromium = null;
+  try {
+    const dir = playwrightBrowsersDir();
+    const rev = fs.readdirSync(dir).filter(d => /^chromium-\d+$/.test(d)).sort().pop();
+    if (rev) {
+      const cands = process.platform === 'win32'
+        ? [path.join(dir, rev, 'chrome-win64', 'chrome.exe'), path.join(dir, rev, 'chrome-win', 'chrome.exe')]
+        : process.platform === 'darwin'
+          ? [path.join(dir, rev, 'chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium')]
+          : [path.join(dir, rev, 'chrome-linux', 'chrome')];
+      for (const c of cands) { if (fs.existsSync(c)) { _fullChromium = c; break; } }
+    }
+  } catch { /* fall back to default */ }
+  return _fullChromium;
+}
 const MAX_LISTINGS_PER_SOURCE = 15; // visit at most this many detail pages/source
 const SOURCE_TIMEOUT_MS  = 150_000; // give up on a single source after 2.5 min
 const LLM_HTML_CHARS     = 10_000;  // chars fed per LLM call
@@ -530,20 +561,18 @@ export const SOURCES = [
       }),
   },
   {
+    // DataDome-protected + SPA. The full-Chromium launch passes DataDome; a short
+    // settle lets the results render. Detail pages: /en/annonces/<id>/. Verified 2026-07.
     name: 'Immotop',
+    settleMs: 5000,
     searchUrls: [
-      'https://www.immotop.lu/fr/louer/?propertyTypes=room',
+      'https://www.immotop.lu/en/location-maisons-appartements/luxembourg-pays/?criterio=rilevanza',
     ],
     extractLinks: async (page) =>
       page.evaluate(() => {
-        const urls = Array.from(
-          document.querySelectorAll('a[href*="/fr/"]')
-        )
+        const urls = Array.from(document.querySelectorAll('a[href]'))
           .map(a => a.href)
-          .filter(href =>
-            /immotop\.lu\/fr\/(louer|annonce|location)\//.test(href) &&
-            /\d{4,}/.test(href)
-          );
+          .filter(href => /immotop\.lu\/en\/annonces\/\d+/.test(href));
         return [...new Set(urls)];
       }),
   },
@@ -841,16 +870,18 @@ export const SOURCES = [
 // Sources that a health check (test-sources.mjs, 2026-07) showed to be dead or
 // unreachable, so we skip them at crawl time to keep scans fast and productive.
 // Kept in SOURCES (not deleted) so they're easy to revive once fixed.
-//   404 / wrong URL:  Immotop, Loft68, LuxMill, ImmoJeune, LuxFriends,
-//                     JustArrived, MyResidHome, RoomieRadar
+//   404 / wrong URL:  Loft68, LuxMill, ImmoJeune, LuxFriends, JustArrived,
+//                     MyResidHome, RoomieRadar
 //   dead domain/cert: LogementPourEtudiants, RechercheColocation
 //   timeout:          FreeRentAds
-//   bot-blocked 403:  Roomlala, Wortimmo    (need anti-bot handling)
+//   Cloudflare:       Wortimmo, Roomlala (managed challenge loops even with a
+//                     real browser — needs an undetected driver we don't bundle)
 //   JS challenge:     Uniplaces
 //   wrong country:    Immoweb (Belgian province, not the Grand Duchy)
-// Working: Appartager (login), Athome, VaubanFort, HousingAnywhere, Spotahome.
+// Working: Appartager (login), Athome, Immotop (full-Chromium beats DataDome),
+//          VaubanFort, HousingAnywhere, Spotahome.
 const SKIPPED_SOURCES = new Set([
-  'Immotop', 'Roomlala', 'LogementPourEtudiants', 'Loft68', 'LuxMill',
+  'Roomlala', 'LogementPourEtudiants', 'Loft68', 'LuxMill',
   'FreeRentAds', 'ImmoJeune', 'LuxFriends', 'RechercheColocation', 'JustArrived',
   'MyResidHome', 'RoomieRadar', 'Wortimmo', 'Uniplaces', 'Immoweb',
 ]);
@@ -965,6 +996,9 @@ export async function crawlSource(sourceConfig, browser) {
       // Always try to dismiss cookie/GDPR banner first — blocks link extraction on many EU sites
       await dismissCookieBanner(page);
       await randomDelay();
+      // Some sites (DataDome/SPA, e.g. Immotop) need a moment for the challenge
+      // to clear and results to render before links exist.
+      if (sourceConfig.settleMs) await page.waitForTimeout(sourceConfig.settleMs);
 
       // ── Tier 1: CSS selectors ──────────────────────────────────────────────
       let links = [];
@@ -1076,7 +1110,9 @@ function withTimeout(promise, ms, msg) {
 export async function crawlAll(onSourceRecords, onSourceDone) {
   await db.initDb();
 
-  const browser        = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
+  const exe            = fullChromiumPath();
+  console.log(`[crawler] Browser: ${exe ? 'full Chromium (beats DataDome)' : 'Playwright default'}`);
+  const browser        = await chromium.launch({ headless: true, executablePath: exe || undefined, args: LAUNCH_ARGS });
   const allNewRecords  = [];
   const total          = ACTIVE_SOURCES.length;
   let   done           = 0;

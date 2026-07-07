@@ -64,17 +64,30 @@ WhatsApp-Wohngruppen sind real und sehr aktiv, aber sie sind **nur auf Einladung
 
 ---
 
-## 4. 🌐 Weitere Websites & Plattformen
+## 4. 🌐 Wohnungs-Websites — was die App abdeckt und was du selbst prüfst
 
-LuxRoom AI überwacht die großen öffentlichen Portale bereits für dich. Diese lohnen auch einen manuellen Blick, besonders die studi- und expat-orientierten:
+LuxRoom AI überwacht automatisch die Portale, die es *kann*. Aber mehrere gute Seiten **blockieren automatisierte Tools** (Anti-Bot-CAPTCHAs) oder brauchen ein Login — die funktionieren einwandfrei, wenn *du* sie im Browser öffnest, also prüfe sie selbst.
 
-- **Private Studierendenwohnheime** — füllen sich schnell; bewirb dich direkt auf deren Seiten.
-- **[JustArrived.lu](https://www.justarrived.lu/en/logement-luxembourg/logement-etudiants-stagiaires/)** — hervorragende englische Leitfäden + Anzeigen für Studierende und Praktikant/innen.
-- **[Furnished.lu](https://www.furnished.lu/)**, **[LuxFriends](https://www.luxfriends.eu/)**, **[Roomie-Radar](https://roomie-radar.com/)** — WG-Plattformen.
-- **[Immotop.lu](https://www.immotop.lu/)**, **athome.lu**, **Wortimmo.lu** — die großen lokalen Portale (von LuxRoom überwacht).
-- **HousingAnywhere / Spotahome / Uniplaces** — internationale Studi-Plattformen; teurer, aber aus dem Ausland buchbar und betrugsgeschützt.
+**✅ Automatisch von der App durchsucht** — hier musst du nicht hin:
+
+- **athome.lu** — das größte luxemburgische Portal
+- **Immotop.lu** — ein weiteres großes lokales Portal
+- **HousingAnywhere** & **Spotahome** — internationale Studi-Plattformen (aus dem Ausland buchbar, betrugsgeschützt)
+- **Appartager** — sobald du dein Login in der App verbindest (Einstellungen → Verbundene Konten)
+- sowie Studierendenwohnheime wie **VaubanFort**
+
+**🔎 Selbst prüfen** — die App kommt nicht ran (CAPTCHA oder Interaktion nötig), aber sie lohnen sich:
+
+- **[Wortimmo.lu](https://www.wortimmo.lu/)** — großes lokales Portal, aber hinter einem Cloudflare-CAPTCHA, das Automatisierung blockiert. Öffnet normal in deinem Browser.
+- **[Roomlala](https://www.roomlala.com/)** — WG-Plattform, dieselbe CAPTCHA-Mauer.
+- **[Uniplaces](https://www.uniplaces.com/)** — Studierendenunterkünfte; ein Bot-Test blockiert die Suche.
+- **[JustArrived.lu](https://www.justarrived.lu/en/logement-luxembourg/logement-etudiants-stagiaires/)** — hervorragende englische Anzeigen für Studierende und Praktikant/innen.
+- **[Furnished.lu](https://www.furnished.lu/)**, **[LuxFriends](https://www.luxfriends.eu/)**, **[Roomie-Radar](https://roomie-radar.com/)** — WG- / Coliving-Plattformen.
+- **[Immoweb.be](https://www.immoweb.be/)** — die *belgische* Seite der Grenze (nur wenn du pendeln würdest; Achtung: keine luxemburgische Domizilierung dort).
 - **Facebook Marketplace** (Luxemburg) — suche *Zimmer* / *room to rent*.
-- **Schwarze Bretter** an Uni und in Supermärkten — altmodisch, aber echte Anzeigen ohne Online-Konkurrenz.
+- **Schwarze Bretter** an Uni und Supermärkten — altmodisch, echte Anzeigen, keine Online-Konkurrenz.
+
+> **Warum kann die App nicht alle?** Seiten wie Wortimmo und Roomlala nutzen kommerzielle Anti-Bot-Systeme (Cloudflare Turnstile), die Automatisierung komplett blockieren. Sie zu umgehen bräuchte kostenpflichtige CAPTCHA-Löser — für ein kostenloses Tool unmöglich. Ein Mensch im normalen Browser kommt direkt rein: eine zweiminütige manuelle Prüfung schließt die Lücke.
 
 ---
 
@@ -145,6 +158,18 @@ Halte alles bereit, um sofort „Ja" sagen zu können, wenn du das richtige Zimm
 ### Du schaffst das 💪
 
 Der luxemburgische Markt ist umkämpft, aber jedes Jahr finden Tausende internationale Studierende ein Zimmer. Sei früh dran, sei reaktionsschnell, schau über die Stadt hinaus, zahle nie vor einer Besichtigung — und lass **LuxRoom AI** die mühsame Website-Überwachung übernehmen, während du dich um die Gruppen und die Uni kümmerst.
+
+---
+
+## 🤝 Kostenlos und Open Source — hilf dem nächsten Studi
+
+LuxRoom AI ist **Open Source und für immer kostenlos** — gebaut, um Studierenden zu helfen, nicht um Geld zu verdienen. Wenn es dir geholfen hat, ist der schönste Dank, es **weiterzugeben**:
+
+- **Erzähl dem nächsten ankommenden Studi** davon.
+- **Trag auf [GitHub](https://github.com/dataoli22/luxroom-ai) bei** — jeder Beitrag wird geschätzt: eine kaputte Quelle reparieren, eine Seite hinzufügen, einen Bug melden, diesen Leitfaden verbessern oder übersetzen. Eine heute tote Quelle braucht vielleicht nur eine korrigierte URL.
+- **⭐ Gib dem Repo einen Stern**, damit andere es finden.
+
+Du musst kein Programmierer sein — schon *„diese Seite geht nicht mehr"* oder *„diese Gruppe sollte in den Leitfaden"* als GitHub-Issue zu melden, hilft. Jeder Beitrag macht die Suche für den nächsten Studi ein bisschen leichter. 💛
 
 ---
 

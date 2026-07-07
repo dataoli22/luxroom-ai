@@ -64,17 +64,30 @@ WhatsApp housing groups are real and active, but they're **invite-only**, so no 
 
 ---
 
-## 4. 🌐 Other websites & platforms
+## 4. 🌐 Housing websites — which the app covers, and which you check yourself
 
-LuxRoom AI already scans the big public portals for you. These are worth a manual look too, especially the student- and expat-focused ones:
+LuxRoom AI automatically watches the portals it *can*. But several good sites **block automated tools** (they use anti-bot CAPTCHAs) or need a login — those work perfectly when *you* open them in a browser, so check them yourself.
 
-- **University-linked / student residences:** private student halls fill up fast — apply directly on their sites.
-- **[JustArrived.lu](https://www.justarrived.lu/en/logement-luxembourg/logement-etudiants-stagiaires/)** — excellent English guides + classifieds for students and interns.
-- **[Furnished.lu](https://www.furnished.lu/)**, **[LuxFriends](https://www.luxfriends.eu/)**, **[Roomie-Radar](https://roomie-radar.com/)** — flatshare-focused platforms.
-- **[Immotop.lu student housing](https://www.immotop.lu/)**, **athome.lu**, **Wortimmo.lu** — the main local portals (LuxRoom watches these).
-- **HousingAnywhere / Spotahome / Uniplaces** — international student platforms; more expensive but book-from-abroad and scam-protected.
+**✅ Searched automatically by the app** — you don't need to visit these:
+
+- **athome.lu** — the biggest Luxembourg portal
+- **Immotop.lu** — another major local portal
+- **HousingAnywhere** & **Spotahome** — international student platforms (bookable from abroad, scam-protected)
+- **Appartager** — once you connect your login in the app (Settings → Connected Accounts)
+- plus student residences such as **VaubanFort**
+
+**🔎 Check these yourself** — the app can't reach them (CAPTCHA-protected or interactive), but they're worth it:
+
+- **[Wortimmo.lu](https://www.wortimmo.lu/)** — a big local portal, but sits behind a Cloudflare CAPTCHA that blocks automation. Loads fine in your own browser.
+- **[Roomlala](https://www.roomlala.com/)** — flatshare platform, same CAPTCHA wall.
+- **[Uniplaces](https://www.uniplaces.com/)** — student accommodation; a bot-challenge blocks its search from tools.
+- **[JustArrived.lu](https://www.justarrived.lu/en/logement-luxembourg/logement-etudiants-stagiaires/)** — excellent English classifieds for students and interns.
+- **[Furnished.lu](https://www.furnished.lu/)**, **[LuxFriends](https://www.luxfriends.eu/)**, **[Roomie-Radar](https://roomie-radar.com/)** — flatshare / coliving platforms.
+- **[Immoweb.be](https://www.immoweb.be/)** — the *Belgian* side of the border (only if you'd commute in; note: no Luxembourg domiciliation there).
 - **Facebook Marketplace** (Luxembourg) — search *chambre* / *room to rent*.
-- **University & supermarket notice boards** — old-school, but real ads with no competition from the internet.
+- **University & supermarket notice boards** — old-school, real ads, zero online competition.
+
+> **Why can't the app do all of them?** Sites like Wortimmo and Roomlala use commercial anti-bot systems (Cloudflare Turnstile) designed to block automation entirely. Beating those needs paid CAPTCHA-solving services — not something a free tool can do. A human in a normal browser gets straight in, so a two-minute manual check covers the gap.
 
 ---
 
@@ -145,6 +158,18 @@ Have these ready so you can say "yes" the moment you find the right room (good r
 ### You've got this 💪
 
 The Luxembourg market is competitive, but thousands of international students find a room every year. Be early, be responsive, look beyond the city, never pay before you visit — and let **LuxRoom AI** handle the tedious website-watching while you work the groups and the university.
+
+---
+
+## 🤝 This is free and open source — help the next student
+
+LuxRoom AI is **open source and free forever** — built to help students, not to make money. If it helped you, the nicest thank-you is to **pay it forward**:
+
+- **Tell the next arriving student** about it.
+- **Contribute on [GitHub](https://github.com/dataoli22/luxroom-ai)** — contributions of any size are genuinely appreciated: fix a broken source, add a new site, report a bug, improve or translate this guide. A source that's dead today might just need a corrected URL.
+- **⭐ Star the repo** so others can find it.
+
+You don't need to be a programmer — even flagging *"this site stopped working"* or *"here's a group that should be in the guide"* as a GitHub issue helps. Every contribution makes the next student's search a little easier. 💛
 
 ---
 

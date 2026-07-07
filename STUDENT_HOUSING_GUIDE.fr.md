@@ -64,17 +64,30 @@ Les groupes WhatsApp logement existent et sont très actifs, mais ils sont **sur
 
 ---
 
-## 4. 🌐 Autres sites et plateformes
+## 4. 🌐 Sites de logement — ce que l'app couvre et ce que vous vérifiez vous-même
 
-LuxRoom AI surveille déjà les grands portails publics pour vous. Ceux-ci valent un coup d'œil manuel, surtout ceux dédiés aux étudiants et expatriés :
+LuxRoom AI surveille automatiquement les portails qu'il *peut*. Mais plusieurs bons sites **bloquent les outils automatisés** (CAPTCHA anti-robots) ou demandent une connexion — ils fonctionnent parfaitement quand *vous* les ouvrez dans un navigateur, alors vérifiez-les vous-même.
 
-- **Résidences étudiantes privées** — elles se remplissent vite ; postulez directement sur leurs sites.
-- **[JustArrived.lu](https://www.justarrived.lu/en/logement-luxembourg/logement-etudiants-stagiaires/)** — excellents guides en anglais + annonces pour étudiants et stagiaires.
-- **[Furnished.lu](https://www.furnished.lu/)**, **[LuxFriends](https://www.luxfriends.eu/)**, **[Roomie-Radar](https://roomie-radar.com/)** — plateformes de colocation.
-- **[Immotop.lu](https://www.immotop.lu/)**, **athome.lu**, **Wortimmo.lu** — les grands portails locaux (surveillés par LuxRoom).
-- **HousingAnywhere / Spotahome / Uniplaces** — plateformes internationales ; plus chères mais réservables depuis l'étranger et protégées contre les arnaques.
+**✅ Surveillés automatiquement par l'app** — pas besoin d'y aller :
+
+- **athome.lu** — le plus grand portail luxembourgeois
+- **Immotop.lu** — un autre grand portail local
+- **HousingAnywhere** & **Spotahome** — plateformes internationales (réservables depuis l'étranger, protégées contre les arnaques)
+- **Appartager** — une fois votre connexion liée dans l'app (Paramètres → Comptes connectés)
+- ainsi que des résidences étudiantes comme **VaubanFort**
+
+**🔎 À vérifier vous-même** — l'app ne peut pas y accéder (CAPTCHA ou interaction requise), mais ils en valent la peine :
+
+- **[Wortimmo.lu](https://www.wortimmo.lu/)** — grand portail local, mais derrière un CAPTCHA Cloudflare qui bloque l'automatisation. S'ouvre normalement dans votre navigateur.
+- **[Roomlala](https://www.roomlala.com/)** — plateforme de colocation, même mur CAPTCHA.
+- **[Uniplaces](https://www.uniplaces.com/)** — logement étudiant ; un test anti-robot bloque sa recherche.
+- **[JustArrived.lu](https://www.justarrived.lu/en/logement-luxembourg/logement-etudiants-stagiaires/)** — excellentes annonces en anglais pour étudiants et stagiaires.
+- **[Furnished.lu](https://www.furnished.lu/)**, **[LuxFriends](https://www.luxfriends.eu/)**, **[Roomie-Radar](https://roomie-radar.com/)** — plateformes de colocation / coliving.
+- **[Immoweb.be](https://www.immoweb.be/)** — le côté *belge* de la frontière (uniquement si vous envisagez de faire la navette ; attention : pas de domiciliation luxembourgeoise là-bas).
 - **Facebook Marketplace** (Luxembourg) — cherchez *chambre* / *room to rent*.
-- **Panneaux d'affichage** de l'université et des supermarchés — à l'ancienne, mais des annonces réelles sans concurrence.
+- **Panneaux d'affichage** de l'université et des supermarchés — à l'ancienne, mais des annonces réelles sans concurrence en ligne.
+
+> **Pourquoi l'app ne peut-elle pas tout faire ?** Des sites comme Wortimmo et Roomlala utilisent des systèmes anti-robots commerciaux (Cloudflare Turnstile) conçus pour bloquer entièrement l'automatisation. Les contourner nécessite des services payants de résolution de CAPTCHA — impossible pour un outil gratuit. Un humain dans un navigateur normal entre directement : une vérification manuelle de deux minutes comble l'écart.
 
 ---
 
@@ -145,6 +158,18 @@ Ayez tout prêt pour pouvoir dire « oui » dès que vous trouvez la bonne chamb
 ### Vous allez y arriver 💪
 
 Le marché luxembourgeois est compétitif, mais des milliers d'étudiants internationaux trouvent une chambre chaque année. Soyez tôt, réactif, regardez au-delà de la ville, ne payez jamais avant d'avoir visité — et laissez **LuxRoom AI** surveiller les sites pendant que vous travaillez les groupes et l'université.
+
+---
+
+## 🤝 Gratuit et open source — aidez le prochain étudiant
+
+LuxRoom AI est **open source et gratuit pour toujours** — conçu pour aider les étudiants, pas pour gagner de l'argent. S'il vous a aidé, le plus beau des remerciements est de **le transmettre** :
+
+- **Parlez-en au prochain étudiant** qui arrive.
+- **Contribuez sur [GitHub](https://github.com/dataoli22/luxroom-ai)** — toute contribution est appréciée : réparer une source cassée, ajouter un site, signaler un bug, améliorer ou traduire ce guide. Une source morte aujourd'hui n'a peut-être besoin que d'une URL corrigée.
+- **⭐ Mettez une étoile** au dépôt pour que d'autres le trouvent.
+
+Pas besoin d'être programmeur — même signaler *« ce site ne marche plus »* ou *« voici un groupe à ajouter au guide »* via un ticket GitHub aide. Chaque contribution facilite un peu la recherche du prochain étudiant. 💛
 
 ---
 

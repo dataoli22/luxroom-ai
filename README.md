@@ -159,6 +159,20 @@ The area guide is Luxembourg-specific, but you can change your city and preferre
 
 ---
 
+## 🤝 Contributing
+
+LuxRoom AI is **open source and free forever**, built to help students. **Contributions of any size are genuinely appreciated** — and you don't have to be a programmer:
+
+- 🐛 **Found a bug or a source that stopped working?** [Open an issue](../../issues) — even a one-line "this site no longer loads" helps.
+- 🌐 **Know a housing site or a Facebook/WhatsApp group we should add?** Tell us in an issue, or add it to the [Housing Guide](STUDENT_HOUSING_GUIDE.md) via a pull request.
+- 🔧 **Can code?** Fixing a scraper selector, adding a source, or improving the UI is a great first PR (sources live in [`src/modules/discovery/crawler.js`](src/modules/discovery/crawler.js)).
+- 🗣️ **Translate** the guide into another language, or improve the existing FR/DE versions.
+- ⭐ **Star the repo** so the next arriving student can find it.
+
+Every contribution makes someone's housing search a little less stressful. 💛
+
+---
+
 ## License
 
 Free and open source under the [MIT License](LICENSE) — use it, share it, no strings attached.

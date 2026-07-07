@@ -31,9 +31,11 @@ const USER_AGENT = process.platform === 'darwin'
   ? 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
   : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
-const DELAY_MIN_MS       = 1500;
-const DELAY_MAX_MS       = 3500;
+const DELAY_MIN_MS       = 900;
+const DELAY_MAX_MS       = 2200;
 const MIN_LINKS_THRESHOLD = 3;      // tiers 2 & 3 trigger below this
+const MAX_LISTINGS_PER_SOURCE = 15; // visit at most this many detail pages/source
+const SOURCE_TIMEOUT_MS  = 150_000; // give up on a single source after 2.5 min
 const LLM_HTML_CHARS     = 10_000;  // chars fed per LLM call
 const BROWSER_USE_MAX_STEPS = 7;    // max agentic steps before giving up
 
@@ -937,11 +939,11 @@ export async function crawlSource(sourceConfig, browser) {
         console.error(`[${sourceConfig.name}] Tier 1 error: ${err.message}`);
       }
 
-      // ── Tier 1 pagination: follow "next page" links to gather more ──────────
-      // Only for working CSS sources that haven't yet hit the same-origin cap.
-      if (links.length > 0 && links.length < 150) {
-        console.log(`[${sourceConfig.name}] Tier 1 pagination (up to 5 pages)…`);
-        const pagedLinks = await paginateAndExtract(page, sourceConfig, 5);
+      // ── Tier 1 pagination: only if we don't already have enough to visit ────
+      // We only visit MAX_LISTINGS_PER_SOURCE detail pages, so there's no point
+      // gathering hundreds of links — paginate just enough.
+      if (links.length > 0 && links.length < MAX_LISTINGS_PER_SOURCE) {
+        const pagedLinks = await paginateAndExtract(page, sourceConfig, 2);
         links = [...new Set([...links, ...pagedLinks])];
       }
 
@@ -976,7 +978,11 @@ export async function crawlSource(sourceConfig, browser) {
       await randomDelay();
     }
 
-    for (const listingUrl of allListingUrls) {
+    // Visit only the first N detail pages so a scan stays fast and results start
+    // appearing quickly. The newest listings are surfaced first by the sources.
+    const toVisit = [...allListingUrls].slice(0, MAX_LISTINGS_PER_SOURCE);
+    console.log(`[${sourceConfig.name}] Visiting ${toVisit.length} of ${allListingUrls.size} listing(s)`);
+    for (const listingUrl of toVisit) {
       console.log(`[${sourceConfig.name}] Visiting listing: ${listingUrl}`);
       const ok = await safeGoto(page, listingUrl);
       if (!ok) { await randomDelay(); continue; }
@@ -1017,21 +1023,41 @@ export async function crawlSource(sourceConfig, browser) {
   return newRecords;
 }
 
-export async function crawlAll() {
+function withTimeout(promise, ms, msg) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(msg || 'timeout')), ms)),
+  ]);
+}
+
+/**
+ * Crawl all sources (3 concurrently). If `onSourceRecords` is provided, it is
+ * called with each source's new records AS SOON AS that source finishes — so the
+ * pipeline can analyse and surface listings incrementally instead of waiting for
+ * every source. Each source is capped by SOURCE_TIMEOUT_MS so one slow site can't
+ * stall the whole scan.
+ */
+export async function crawlAll(onSourceRecords) {
   await db.initDb();
 
   const browser        = await chromium.launch({ headless: true });
   const allNewRecords  = [];
 
   try {
-    // Crawl up to 3 sources at once — each crawlSource opens its own browser
-    // context, and Chromium handles many concurrent contexts per instance.
     await mapLimit(SOURCES, 3, async (sourceConfig) => {
       console.log(`\n[crawler] Starting source: ${sourceConfig.name}`);
       try {
-        const records = await crawlSource(sourceConfig, browser);
+        const records = await withTimeout(
+          crawlSource(sourceConfig, browser),
+          SOURCE_TIMEOUT_MS,
+          `${sourceConfig.name} exceeded ${SOURCE_TIMEOUT_MS / 1000}s — moving on`
+        );
         allNewRecords.push(...records);
         console.log(`[crawler] ${sourceConfig.name} — ${records.length} new record(s)`);
+        if (records.length && typeof onSourceRecords === 'function') {
+          try { await onSourceRecords(records, sourceConfig.name); }
+          catch (e) { console.error('[crawler] onSourceRecords error:', e.message); }
+        }
       } catch (err) {
         console.error(`[crawler] Error in source ${sourceConfig.name}: ${err.message}`);
       }

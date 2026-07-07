@@ -72,30 +72,11 @@ export async function processNewListings() {
   beginBatch();
 
   try {
-    let rawRecords;
-    try {
-      rawRecords = await crawlAll();
-    } catch (err) {
-      logError('[pipeline] crawlAll() failed:', err);
-      _running = false;
-      _scanPhase = 'idle';
-      emitScanProgress();
-      return;
-    }
-
-    log(`[pipeline] Crawled ${rawRecords.length} raw record(s)`);
-    _scanPhase = 'analysing';
-    _scanTotal = rawRecords.length;
-    _scanCurrent = 0;
-    emitScanProgress();
-
     // Per-listing work — steps a through i. Returns { saved } so the caller can
-    // tally results. `continue` in the old sequential loop becomes an early
-    // `return { saved: false }` here.
-    async function processOne(rawRecord, i) {
-      const label = rawRecord.url ?? `record[${i}]`;
-
-      log(`[pipeline] Processing (${i + 1}/${rawRecords.length}): ${label}`);
+    // tally results.
+    async function processOne(rawRecord) {
+      const label = rawRecord.url ?? 'record';
+      log(`[pipeline] Processing: ${label}`);
 
       // Step a: extract
       let extracted;
@@ -201,19 +182,38 @@ export async function processNewListings() {
       }
 
       // Step i: progress log
-      log(`[pipeline] Done (${i + 1}/${rawRecords.length}): ${label} — opportunityScore=${record.opportunityScore ?? 'n/a'}`);
+      log(`[pipeline] Done: ${label} — opportunityScore=${record.opportunityScore ?? 'n/a'}`);
 
       return { saved: true };
     }
 
-    // Process listings with bounded concurrency (max 3 in flight at once).
-    // Bump the live progress counter as each listing finishes.
-    await mapLimit(rawRecords, 3, async (rec, i) => {
-      const r = await processOne(rec, i);
-      _scanCurrent++;
+    // Analyse each source's new records the moment that source finishes crawling,
+    // so listings start appearing within a minute or two — not only after the
+    // entire crawl (which spans many sites) is done.
+    const onSourceRecords = async (records) => {
+      _scanPhase = 'analysing';
+      _scanTotal += records.length;
       emitScanProgress();
-      return r;
-    });
+      await mapLimit(records, 3, async (rec) => {
+        const r = await processOne(rec);
+        _scanCurrent++;
+        emitScanProgress();
+        return r;
+      });
+    };
+
+    let crawledTotal = 0;
+    try {
+      const all = await crawlAll(onSourceRecords);
+      crawledTotal = all.length;
+    } catch (err) {
+      logError('[pipeline] crawlAll() failed:', err);
+      _running = false;
+      _scanPhase = 'idle';
+      emitScanProgress();
+      return;
+    }
+    log(`[pipeline] Crawl complete — ${crawledTotal} new raw record(s)`);
 
     // Stale-listing pass — flag anything not seen recently. Never let a failure
     // here break the cycle.

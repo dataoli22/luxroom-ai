@@ -7,6 +7,7 @@ import OnboardingView from './OnboardingView.jsx'
 import ModelManagerView from './ModelManagerView.jsx'
 import HelpView from './HelpView.jsx'
 import ScanProgress from './ScanProgress.jsx'
+import AiSetup from './AiSetup.jsx'
 
 const TABS = ['listings', 'approvals', 'log', 'settings', 'help']
 const TAB_LABELS = { listings: '🏠 Listings', approvals: '✉️ Approvals', log: '📋 Log', settings: '⚙️ Settings', help: '❓ Help' }
@@ -28,6 +29,7 @@ export default function App() {
   const [scanInterval, setScanInterval] = useState(6)
   const [showIntervalPicker, setShowIntervalPicker] = useState(false)
   const [lastScanEmpty, setLastScanEmpty] = useState(false)
+  const [aiProvider, setAiProvider] = useState(null)
   const [now, setNow] = useState(Date.now())
 
   useEffect(() => {
@@ -40,6 +42,13 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showModels, setShowModels] = useState(false)
   const [showFirstRun, setShowFirstRun] = useState(false)
+  const [aiConfigured, setAiConfigured] = useState(null) // null=checking, true/false
+  const [showAiSetup, setShowAiSetup] = useState(false)   // manual open from header
+
+  const checkAi = async () => {
+    try { const s = await window.luxroom?.ai?.status(); const ok = !!s?.configured; setAiConfigured(ok); return ok }
+    catch { setAiConfigured(false); return false }
+  }
 
   // Keyboard shortcuts: 1-5 switch tabs, Ctrl/Cmd+R = Run Now
   useEffect(() => {
@@ -82,8 +91,10 @@ export default function App() {
       const h = Number(s?.crawlIntervalHours || s?.CRAWL_INTERVAL_HOURS || 6)
       if (h) setScanInterval(h)
       // Show the one-time "how scanning works" prompt to onboarded users who
-      // haven't seen it yet.
+      // haven't seen it yet — but only once the AI is set up (gate comes first).
       if (done && !s?.firstRunPromptShown) setShowFirstRun(true)
+      // Check whether the AI is properly configured (gates the app).
+      if (done) checkAi()
     }).catch(() => {
       setOnboardingDone(false)
       setShowOnboarding(true)
@@ -120,6 +131,7 @@ export default function App() {
   useEffect(() => {
     const poll = () => {
       window.luxroom?.pipeline.status().then(setStatus).catch(() => {})
+      window.luxroom?.ai?.activeProvider().then(setAiProvider).catch(() => {})
     }
     poll()
     const id = setInterval(poll, 10000)
@@ -153,8 +165,10 @@ export default function App() {
       const s = await window.luxroom?.pipeline.start()
       if (s) setStatus(s)
     } catch {}
-    // Explain the one-time first scan.
+    // Queue the first-scan explainer, but the AI-setup gate shows first if the
+    // AI isn't configured yet.
     setShowFirstRun(true)
+    checkAi()
   }
 
   const handleEditProfile = () => {
@@ -201,6 +215,21 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {aiProvider && (() => {
+            const LABEL = { groq: 'Groq', gemini: 'Gemini', openai: 'OpenAI', anthropic: 'Claude', ollama: 'Local', hermes: 'Hermes' }
+            const isFree = ['groq', 'gemini', 'ollama', 'hermes'].includes(aiProvider)
+            return (
+              <button onClick={() => setShowAiSetup(true)} title="Which AI is analysing your listings — click to configure"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '5px 10px', borderRadius: 6, border: `1px solid ${c.border}`,
+                  background: 'transparent', cursor: 'pointer', fontSize: 12, color: c.sub,
+                }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: isFree ? '#4ade80' : '#f0a868', display: 'inline-block' }} />
+                AI: <span style={{ color: c.text, fontWeight: 600 }}>{LABEL[aiProvider] || aiProvider}</span>
+              </button>
+            )
+          })()}
           <button onClick={() => setShowModels(true)} style={{
             padding: '5px 12px', borderRadius: 6, border: `1px solid ${c.border}`,
             background: 'transparent', color: c.sub, cursor: 'pointer', fontSize: 12,
@@ -272,8 +301,18 @@ export default function App() {
       {/* Model manager overlay */}
       {showModels && <ModelManagerView onClose={() => setShowModels(false)} />}
 
-      {/* One-time "how scanning works" prompt */}
-      {showFirstRun && (
+      {/* Mandatory AI-setup gate — shown before anything else until AI works */}
+      {onboardingDone && !showOnboarding && aiConfigured === false && (
+        <AiSetup blocking onDone={() => { setAiConfigured(true) }} />
+      )}
+
+      {/* Manual AI setup (opened from the header pill) */}
+      {showAiSetup && aiConfigured !== false && (
+        <AiSetup onClose={() => setShowAiSetup(false)} onDone={() => setShowAiSetup(false)} />
+      )}
+
+      {/* One-time "how scanning works" prompt — only after AI is set up */}
+      {showFirstRun && aiConfigured === true && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 20,

@@ -203,7 +203,7 @@ function buildTray() {
 }
 
 // ESM module refs — populated after app is ready
-let _settings, _pipeline, _db, _messaging, _hermes, _hardware, _auth
+let _settings, _pipeline, _db, _messaging, _hermes, _hardware, _auth, _ai
 
 async function loadModules() {
   const base = 'file:///' + __dirname.replace(/\\/g, '/') + '/../src/'
@@ -214,6 +214,7 @@ async function loadModules() {
   _hermes    = await import(base + 'modules/hermes/hermes.js')
   _hardware  = await import(base + 'hardware.js')
   _auth      = await import(base + 'modules/auth/login.js')
+  _ai        = await import(base + 'modules/ai/complete.js')
 }
 
 function authDir() {
@@ -520,6 +521,39 @@ ipcMain.handle('settings:save', async (_e, partial) => {
     await _pipeline.startPipeline()
   }
   return next
+})
+
+// Which provider will actually be used right now (resolves 'auto').
+ipcMain.handle('ai:active-provider', async () => {
+  try { return _ai.activeProvider(_settings.getSettings()) } catch { return 'ollama' }
+})
+
+// Is the AI usable? A cloud key OR a running Ollama with at least one model.
+ipcMain.handle('ai:status', async () => {
+  const s = _settings.getSettings()
+  const hasCloudKey = !!(s.groqApiKey || s.geminiApiKey || s.openaiApiKey || s.anthropicApiKey || s.ANTHROPIC_API_KEY)
+  let ollamaRunning = await isOllamaUp()
+  // If there's no cloud key and Ollama isn't up, nudge it to start (non-blocking)
+  // so any already-installed models are detected on this or the next poll.
+  if (!ollamaRunning && !hasCloudKey) {
+    try { spawn(resolveOllama(), ['serve'], { detached: true, stdio: 'ignore', windowsHide: true }).unref() } catch {}
+    try { spawn('ollama', ['serve'], { shell: true, detached: true, stdio: 'ignore', windowsHide: true }).unref() } catch {}
+    await sleep(1200)
+    ollamaRunning = await isOllamaUp()
+  }
+  let models = []
+  if (ollamaRunning) {
+    try {
+      const r = await ollamaRequest('GET', '/api/tags', null, { timeout: 2500 })
+      if (r.status === 200) {
+        const d = JSON.parse(r.body)
+        models = (d.models ?? []).map(m => ({ name: m.name ?? m.model ?? '', size: humanSize(m.size) }))
+      }
+    } catch { /* ignore */ }
+  }
+  const provider = _ai ? _ai.activeProvider(s) : 'ollama'
+  const configured = hasCloudKey || (ollamaRunning && models.length > 0)
+  return { configured, provider, hasCloudKey, ollamaRunning, models }
 })
 
 ipcMain.handle('pipeline:start', async () => {
@@ -849,13 +883,16 @@ async function isOllamaUp() {
   } catch { return false }
 }
 
+// The app starts Ollama's server itself (no terminal for the user). Tries the
+// resolved binary, then a PATH/shell fallback, then waits for the server to come up.
 async function ensureOllamaServer() {
   if (await isOllamaUp()) return true
-  // Try to start the server in the background, then wait for it.
-  try {
-    spawn(resolveOllama(), ['serve'], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
-  } catch { /* binary not found — nothing we can do */ }
-  for (let i = 0; i < 10; i++) {
+  const attempts = [
+    () => spawn(resolveOllama(), ['serve'], { detached: true, stdio: 'ignore', windowsHide: true }).unref(),
+    () => spawn('ollama', ['serve'], { shell: true, detached: true, stdio: 'ignore', windowsHide: true }).unref(),
+  ]
+  for (const start of attempts) { try { start() } catch {} }
+  for (let i = 0; i < 12; i++) {
     await sleep(1500)
     if (await isOllamaUp()) return true
   }
@@ -870,7 +907,9 @@ ipcMain.handle('setup:pull-model', async (_e, model) => {
 
   const up = await ensureOllamaServer()
   if (!up) {
-    const msg = 'Ollama is installed but not running. Open Ollama (Start menu / menu bar), then click Retry.'
+    // The app couldn't start Ollama automatically. Steer to the 1-click cloud
+    // option rather than asking a non-technical user to run terminal commands.
+    const msg = "Couldn't start the local AI (Ollama) automatically. Easiest fix: add a free Groq key in the AI setup — it needs no install."
     pushSetupProgress('pull', msg, null, true)
     throw new Error(msg)
   }

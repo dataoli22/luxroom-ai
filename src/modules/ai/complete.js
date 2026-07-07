@@ -13,23 +13,36 @@
 import Anthropic from "@anthropic-ai/sdk";
 import fetch from "node-fetch";
 
-function resolveProvider(settings) {
-  let provider = (settings.aiProvider || "ollama").toLowerCase();
-  const hasAnthropic = settings.anthropicApiKey || settings.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
-  if (provider === "openai" && !settings.openaiApiKey) {
-    console.warn("[ai] OpenAI selected but no API key — falling back to local Ollama");
-    provider = "ollama";
-  } else if (provider === "gemini" && !settings.geminiApiKey) {
-    console.warn("[ai] Gemini selected but no API key — falling back to local Ollama");
-    provider = "ollama";
-  } else if (provider === "groq" && !settings.groqApiKey) {
-    console.warn("[ai] Groq selected but no API key — falling back to local Ollama");
-    provider = "ollama";
-  } else if (provider === "anthropic" && !hasAnthropic) {
-    console.warn("[ai] Anthropic selected but no API key — falling back to local Ollama");
-    provider = "ollama";
+const hasAnthropicKey = (s) => !!(s.anthropicApiKey || s.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY);
+
+/**
+ * Decide which provider actually handles a request.
+ *
+ * Default ('auto'): prefer a configured cloud key — Groq first (free + fast) —
+ * then fall back to free local Ollama. So the moment a key is added, it's used
+ * automatically; if none, it runs locally. An explicit provider is honoured, but
+ * still falls back to Ollama if its key is missing (never a hard failure).
+ */
+export function activeProvider(settings) {
+  let provider = (settings.aiProvider || "auto").toLowerCase();
+
+  if (provider === "auto") {
+    if (settings.groqApiKey) return "groq";
+    if (settings.geminiApiKey) return "gemini";
+    if (settings.openaiApiKey) return "openai";
+    if (hasAnthropicKey(settings)) return "anthropic";
+    return "ollama";
   }
+
+  if (provider === "openai" && !settings.openaiApiKey) provider = "ollama";
+  else if (provider === "gemini" && !settings.geminiApiKey) provider = "ollama";
+  else if (provider === "groq" && !settings.groqApiKey) provider = "ollama";
+  else if (provider === "anthropic" && !hasAnthropicKey(settings)) provider = "ollama";
   return provider;
+}
+
+function resolveProvider(settings) {
+  return activeProvider(settings);
 }
 
 async function callAnthropic(settings, systemPrompt, userMessage, { maxTokens }) {

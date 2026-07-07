@@ -83,6 +83,7 @@ const linkBtnStyle = {
 
 // Free-first ordering. `cost` drives the little tag under each picker button.
 const PROVIDERS = [
+  { id: 'auto',      label: 'Auto',      cost: 'Recommended' },
   { id: 'ollama',    label: 'Ollama',    cost: 'Free · Local' },
   { id: 'hermes',    label: 'Hermes',    cost: 'Free · Local' },
   { id: 'groq',      label: 'Groq',      cost: 'Free tier' },
@@ -90,7 +91,7 @@ const PROVIDERS = [
   { id: 'anthropic', label: 'Anthropic', cost: 'Paid' },
   { id: 'openai',    label: 'OpenAI',    cost: 'Paid' },
 ];
-const costColor = (cost) => cost.startsWith('Free') ? '#6ee7b7' : '#f0a868';
+const costColor = (cost) => cost.startsWith('Free') ? '#6ee7b7' : cost === 'Recommended' ? '#c4b5fd' : '#f0a868';
 
 // The UI uses camelCase field names, but the backend (notifier, pipeline,
 // extractor) reads these UPPERCASE env-style keys. Map between them on save/load
@@ -126,7 +127,7 @@ function Field({ label, helper, children, fullWidth }) {
 
 export default function SettingsView({ onEditProfile }) {
   const [form, setForm] = useState({
-    aiProvider: 'ollama',
+    aiProvider: 'auto',
     anthropicApiKey: '',
     openaiApiKey: '',
     openaiModel: 'gpt-4o',
@@ -376,6 +377,20 @@ export default function SettingsView({ onEditProfile }) {
             );
           })}
         </div>
+
+        {/* Auto (recommended) */}
+        {(form.aiProvider === 'auto' || !form.aiProvider) && (
+          <div style={gridStyle}>
+            <div style={{ gridColumn: '1 / -1', background: '#12102a', border: '1px solid #2a2060', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: '#c4b5fd', lineHeight: 1.6 }}>
+              ✓ Recommended — LuxRoom automatically uses your best option. If you add a free <strong>Groq</strong> key (fast cloud),
+              it's used automatically; otherwise it runs free on your device with <strong>Ollama</strong>. Nothing else to configure.
+            </div>
+            <div style={{ gridColumn: '1 / -1', fontSize: 12.5, color: '#8080a8', lineHeight: 1.7 }}>
+              Priority: <span style={{ color: '#6ee7b7' }}>Groq (if key added)</span> → <span style={{ color: '#6ee7b7' }}>local Ollama</span>.
+              To add a key, pick <strong style={{ color: '#c4b5fd' }}>Groq</strong> above, paste your free key, and Auto will use it.
+            </div>
+          </div>
+        )}
 
         {/* Anthropic */}
         {form.aiProvider === 'anthropic' && (

@@ -69,6 +69,11 @@ contextBridge.exposeInMainWorld('luxroom', {
     detect: () => ipcRenderer.invoke('hardware:detect'),
   },
 
+  ai: {
+    activeProvider: () => ipcRenderer.invoke('ai:active-provider'),
+    status: () => ipcRenderer.invoke('ai:status'),
+  },
+
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
   },

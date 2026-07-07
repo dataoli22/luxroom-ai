@@ -11,6 +11,17 @@ const QUICK_MODELS = [
   { name: 'hermes3',     size: '4.7 GB', note: 'Best analysis quality (needs 16 GB RAM)' },
 ]
 
+// Ollama Cloud models (ollama.com/search?c=cloud, July 2026). Lighter ones are
+// gentler on the free tier's daily quota — good defaults for listing analysis.
+const CLOUD_MODELS = [
+  { name: 'gpt-oss:20b',       note: 'Recommended — light, great JSON, easy on free quota' },
+  { name: 'qwen3.5',           note: 'Strong multilingual (FR/DE)' },
+  { name: 'gemma4',            note: 'Google — light and accurate' },
+  { name: 'deepseek-v4-flash', note: 'Fast reasoning' },
+  { name: 'glm-4.7',           note: 'Solid all-rounder' },
+  { name: 'gpt-oss:120b',      note: 'Highest quality — uses quota faster' },
+]
+
 const btn = (bg, color, border, extra = {}) => ({
   background: bg, color, border: `1px solid ${border}`, borderRadius: 8,
   padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', ...extra,
@@ -26,21 +37,25 @@ export default function AiSetup({ blocking, onDone, onClose }) {
   const [mode, setMode] = useState('cloud') // 'cloud' | 'local'
   const [groqKey, setGroqKey] = useState('')
   const [ollamaKey, setOllamaKey] = useState('')
+  const [cloudModel, setCloudModel] = useState('gpt-oss:20b')
   const [savingKey, setSavingKey] = useState('')   // which key is saving
   const [keyMsg, setKeyMsg] = useState('')
   const [pull, setPull] = useState(null) // { model, pct, msg, error, done }
+  const [showGuide, setShowGuide] = useState(false)
 
   const refresh = () => window.luxroom?.ai?.status().then(setStatus).catch(() => {})
   useEffect(() => { refresh(); const id = setInterval(refresh, 4000); return () => clearInterval(id) }, [])
+  useEffect(() => {
+    window.luxroom?.settings.get().then(s => { if (s?.ollamaCloudModel) setCloudModel(s.ollamaCloudModel) }).catch(() => {})
+  }, [])
 
   const configured = !!status?.configured
   const busy = pull && !pull.done && !pull.error
 
-  async function saveKey(which, field, value) {
-    if (!value.trim()) return
+  async function savePayload(which, payload) {
     setSavingKey(which); setKeyMsg('')
     try {
-      await window.luxroom?.settings.save({ [field]: value.trim(), aiProvider: 'auto' })
+      await window.luxroom?.settings.save({ ...payload, aiProvider: 'auto' })
       setKeyMsg('✓ Saved — cloud AI is ready.')
       await refresh()
     } catch (e) {
@@ -120,7 +135,7 @@ export default function AiSetup({ blocking, onDone, onClose }) {
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <input type="password" value={groqKey} onChange={e => setGroqKey(e.target.value)} placeholder="Paste your Groq key (gsk_…)"
                   style={{ flex: 1, minWidth: 180, background: c.bg, border: `1px solid ${c.border}`, color: c.text, padding: '10px 12px', borderRadius: 8, fontSize: 13, outline: 'none' }} />
-                <button onClick={() => saveKey('groq', 'groqApiKey', groqKey)} disabled={!groqKey.trim() || savingKey} style={btn(groqKey.trim() ? c.accent : c.border, '#fff', c.accent, { cursor: groqKey.trim() ? 'pointer' : 'default' })}>
+                <button onClick={() => savePayload('groq', { groqApiKey: groqKey.trim() })} disabled={!groqKey.trim() || savingKey} style={btn(groqKey.trim() ? c.accent : c.border, '#fff', c.accent, { cursor: groqKey.trim() ? 'pointer' : 'default' })}>
                   {savingKey === 'groq' ? 'Saving…' : 'Save'}
                 </button>
               </div>
@@ -133,17 +148,35 @@ export default function AiSetup({ blocking, onDone, onClose }) {
             {/* Ollama Cloud */}
             <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, padding: '12px 14px' }}>
               <div style={{ color: c.text, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Ollama Cloud <span style={{ color: c.sub, fontWeight: 600, fontSize: 11 }}>· hosted models via your Ollama key</span></div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
                 <input type="password" value={ollamaKey} onChange={e => setOllamaKey(e.target.value)} placeholder="Paste your Ollama API key"
                   style={{ flex: 1, minWidth: 180, background: c.bg, border: `1px solid ${c.border}`, color: c.text, padding: '10px 12px', borderRadius: 8, fontSize: 13, outline: 'none' }} />
-                <button onClick={() => saveKey('ollama', 'OLLAMA_API_KEY', ollamaKey)} disabled={!ollamaKey.trim() || savingKey} style={btn(ollamaKey.trim() ? c.accent : c.border, '#fff', c.accent, { cursor: ollamaKey.trim() ? 'pointer' : 'default' })}>
+                <button onClick={() => savePayload('ollama', { OLLAMA_API_KEY: ollamaKey.trim(), ollamaCloudModel: cloudModel })} disabled={!ollamaKey.trim() || savingKey} style={btn(ollamaKey.trim() ? c.accent : c.border, '#fff', c.accent, { cursor: ollamaKey.trim() ? 'pointer' : 'default' })}>
                   {savingKey === 'ollama' ? 'Saving…' : 'Save'}
                 </button>
               </div>
-              <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com/settings/keys')}
-                style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: '8px 0 0', fontWeight: 600 }}>
-                Get your Ollama key →
-              </button>
+              {/* Cloud model picker */}
+              <label style={{ display: 'block', color: c.sub, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 5 }}>Cloud model</label>
+              <select value={CLOUD_MODELS.some(m => m.name === cloudModel) ? cloudModel : '__custom'}
+                onChange={e => { if (e.target.value !== '__custom') setCloudModel(e.target.value) }}
+                style={{ width: '100%', background: c.bg, border: `1px solid ${c.border}`, color: c.text, padding: '9px 10px', borderRadius: 8, fontSize: 13, outline: 'none' }}>
+                {CLOUD_MODELS.map(m => <option key={m.name} value={m.name}>{m.name} — {m.note}</option>)}
+                <option value="__custom">Custom…</option>
+              </select>
+              {!CLOUD_MODELS.some(m => m.name === cloudModel) && (
+                <input value={cloudModel} onChange={e => setCloudModel(e.target.value)} placeholder="e.g. qwen3-coder"
+                  style={{ width: '100%', marginTop: 6, background: c.bg, border: `1px solid ${c.border}`, color: c.text, padding: '9px 10px', borderRadius: 8, fontSize: 13, outline: 'none' }} />
+              )}
+              <div style={{ display: 'flex', gap: 14, marginTop: 8, flexWrap: 'wrap' }}>
+                <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com/settings/keys')}
+                  style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: 0, fontWeight: 600 }}>
+                  Get your Ollama key →
+                </button>
+                <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com/search?c=cloud')}
+                  style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: 0, fontWeight: 600 }}>
+                  Browse cloud models →
+                </button>
+              </div>
             </div>
             {keyMsg && <div style={{ marginTop: 10, fontSize: 12, color: keyMsg.startsWith('✓') ? c.green : '#f87171' }}>{keyMsg}</div>}
           </div>
@@ -189,9 +222,35 @@ export default function AiSetup({ blocking, onDone, onClose }) {
                 <div style={{ fontSize: 12, fontFamily: 'monospace', color: pull.error ? '#f87171' : pull.done ? c.green : '#9090b8' }}>
                   {pull.model}: {pull.msg}
                 </div>
-                {pull.error && <div style={{ fontSize: 12, color: '#a89060', marginTop: 4 }}>Trouble with local AI? Switch to the ⚡ Free cloud tab — it needs no install.</div>}
+                {pull.error && <div style={{ fontSize: 12, color: '#a89060', marginTop: 4 }}>Trouble with local AI? Switch to the ☁️ Cloud tab — it needs no install.</div>}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Guide */}
+        <button onClick={() => setShowGuide(g => !g)}
+          style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: 12.5, cursor: 'pointer', padding: '16px 0 0', fontWeight: 600 }}>
+          {showGuide ? '▾' : '▸'} Which should I choose? &amp; how models work
+        </button>
+        {showGuide && (
+          <div style={{ marginTop: 8, background: '#0d0d18', border: `1px solid ${c.border}`, borderRadius: 10, padding: '14px 16px', fontSize: 12.5, color: '#9090b8', lineHeight: 1.7 }}>
+            <div style={{ marginBottom: 8 }}>
+              <strong style={{ color: '#c4b5fd' }}>☁️ Cloud (Groq / Ollama Cloud)</strong> — runs on powerful servers, so it's fast and doesn't strain your laptop.
+              Both have <strong>free tiers with daily limits</strong>; pick a <strong>lighter model</strong> (e.g. gpt-oss:20b) to make your free quota last.
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <strong style={{ color: c.greenDim }}>💻 On my device</strong> — private and works offline, but <strong>slower</strong> (uses your CPU). Best if you can't sign up for a key.
+            </div>
+            <div style={{ background: '#12102a', border: '1px solid #2a2060', borderRadius: 8, padding: '10px 12px', color: '#b0a8d0' }}>
+              <strong style={{ color: '#c4b5fd' }}>Downloads vs. what's actually used — they're different:</strong><br />
+              • <strong>🤖 Models</strong> (top bar) and Settings → Local Extraction just <strong>download</strong> local models to your device.<br />
+              • <strong>This panel</strong> (and the AI bar on Listings) chooses <strong>which AI actually analyses your listings</strong> — cloud or local. Downloading a model doesn't switch to it; selecting it here does.
+            </div>
+            <button onClick={() => window.luxroom?.shell?.openExternal('https://ollama.com/search?c=cloud')}
+              style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: '10px 0 0', fontWeight: 600 }}>
+              See all Ollama Cloud models & free limits →
+            </button>
           </div>
         )}
 

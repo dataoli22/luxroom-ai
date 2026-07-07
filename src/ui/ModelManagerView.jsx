@@ -103,8 +103,8 @@ export default function ModelManagerView({ onClose }) {
           padding: '18px 24px', borderBottom: `1px solid ${c.border}`, flexShrink: 0,
         }}>
           <div>
-            <div style={{ color: c.text, fontWeight: 700, fontSize: 16 }}>Configure AI Models</div>
-            <div style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>Download, switch, or remove local Ollama models</div>
+            <div style={{ color: c.text, fontWeight: 700, fontSize: 16 }}>Download local AI models</div>
+            <div style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>This downloads models to your device. To choose which AI actually runs (incl. cloud), use the <strong style={{ color: '#c4b5fd' }}>AI</strong> button in the top bar.</div>
           </div>
           <button onClick={onClose} style={{
             background: 'none', border: 'none', color: c.sub,

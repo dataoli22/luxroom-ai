@@ -34,3 +34,4 @@ UsersolichAppDataLocal*
 
 # Playwright browsers bundled at build time (installed via npm run pw:install)
 pw-browsers/
+output/

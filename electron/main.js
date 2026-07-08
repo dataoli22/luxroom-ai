@@ -390,16 +390,24 @@ async function maybeReprocessStoredRaw() {
   try {
     if (_reprocessRunning) return
     const s = _settings.getSettings()
-    if (s.reprocessedStoredRawV1) return
+    // Run if we've never patched, OR if there are captured pages that were never
+    // committed to listings (analysed-but-not-saved data waiting to be recovered).
+    const rawN  = await _db.countRaw().catch(() => 0)
+    const listN = await _db.countListings().catch(() => 0)
+    const hasUncommitted = rawN > listN
+    if (s.reprocessedStoredRawV1 && !hasUncommitted) return
     // Only run when the AI can actually analyse — a cloud key, or a running Ollama.
     const hasCloudKey = !!(s.OLLAMA_API_KEY || s.groqApiKey || s.geminiApiKey || s.openaiApiKey || s.anthropicApiKey || s.ANTHROPIC_API_KEY)
     const aiReady = hasCloudKey || await isOllamaUp().catch(() => false)
     if (!aiReady) return // try again next launch or after a scan
     _reprocessRunning = true
-    console.log('[main] Running one-time recovery of historical listings from stored HTML…')
-    await _pipeline.reprocessStoredRaw()
+    console.log(`[main] Recovering listings from stored HTML (${rawN} captured, ${listN} committed)…`)
+    const res = await _pipeline.reprocessStoredRaw()
     _settings.saveSettings({ reprocessedStoredRawV1: true })
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('approvals:updated')
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('approvals:updated')
+      mainWindow.webContents.send('recovery:done', res || {})
+    }
   } catch (err) {
     console.error('[main] historical recovery failed:', err.message)
   } finally {

@@ -261,6 +261,14 @@ export async function getAllRaw() {
   return all('SELECT url, html, timestamp, source, htmlHash FROM listings_raw');
 }
 
+// How many pages we captured HTML for. If this exceeds the listings count, some
+// analysed/captured pages were never committed — the recovery pass will pull them.
+export async function countRaw() {
+  await getDb();
+  const row = get('SELECT COUNT(*) AS n FROM listings_raw');
+  return row?.n ?? 0;
+}
+
 export async function updateListing(url, fields) {
   await getDb();
   const jsonFields = new Set(['pros', 'cons', 'dealbreakers', 'messageDrafts', 'sentEvents']);

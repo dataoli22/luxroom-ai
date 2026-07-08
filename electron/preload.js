@@ -41,6 +41,11 @@ contextBridge.exposeInMainWorld('luxroom', {
       ipcRenderer.on('update:status', handler);
       return () => ipcRenderer.removeListener('update:status', handler);
     },
+    onRecovery: (callback) => {
+      const handler = (_, data) => callback(data);
+      ipcRenderer.on('recovery:done', handler);
+      return () => ipcRenderer.removeListener('recovery:done', handler);
+    },
   },
 
   auth: {

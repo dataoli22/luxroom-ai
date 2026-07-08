@@ -33,16 +33,45 @@ export default function App() {
   const [now, setNow] = useState(Date.now())
   const [update, setUpdate] = useState({ status: 'idle' })
   const [updateDismissed, setUpdateDismissed] = useState(false)
+  const [appVersion, setAppVersion] = useState('')
+  const [doneBanner, setDoneBanner] = useState(null)   // transient "updated / recovered" banner
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
   }, [])
 
-  // Auto-update: subscribe to status and seed the current state.
+  // Auto-update: subscribe to status, seed state, show the version, and flash a
+  // one-time "Updated to vX" banner right after an update was applied.
   useEffect(() => {
-    window.luxroom?.update?.getState().then(s => s && setUpdate(s)).catch(() => {})
+    window.luxroom?.update?.getState().then(async (s) => {
+      if (!s) return
+      setUpdate(s)
+      if (s.current) setAppVersion(s.current)
+      try {
+        const saved = await window.luxroom?.settings.get()
+        const last = saved?.lastSeenVersion
+        if (s.current && last && last !== s.current) {
+          setDoneBanner(`✓ Updated to v${s.current} — your listings and settings are intact.`)
+          setTimeout(() => setDoneBanner(null), 10000)
+        }
+        if (s.current && last !== s.current) window.luxroom?.settings.save({ lastSeenVersion: s.current })
+      } catch {}
+    }).catch(() => {})
     const unsub = window.luxroom?.update?.onStatus?.((s) => { setUpdate(s); if (s?.status === 'available' || s?.status === 'downloaded') setUpdateDismissed(false) })
+    return () => unsub?.()
+  }, [])
+
+  // Historical-data recovery finished — flash a banner for ~10s.
+  useEffect(() => {
+    const unsub = window.luxroom?.update?.onRecovery?.((res) => {
+      const n = res?.recovered ?? 0
+      if (n > 0) {
+        setDoneBanner(`✓ Recovered ${n} listing${n !== 1 ? 's' : ''} from earlier scans — no re-scan needed.`)
+        setTimeout(() => setDoneBanner(null), 10000)
+        window.luxroom?.pipeline.status().then(setStatus).catch(() => {})
+      }
+    })
     return () => unsub?.()
   }, [])
 
@@ -312,6 +341,20 @@ export default function App() {
         </div>
       </div>
 
+      {/* Transient "updated / recovered" confirmation (auto-hides after ~10s) */}
+      {doneBanner && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
+          padding: '8px 16px', fontSize: 13, background: '#0d1a0d',
+          borderBottom: '1px solid #1a4a1a', color: '#6ee7b7',
+        }}>
+          <span style={{ flex: 1 }}>{doneBanner}</span>
+          <button onClick={() => setDoneBanner(null)} title="Dismiss" style={{
+            background: 'none', border: 'none', color: 'inherit', opacity: 0.6, fontSize: 16, cursor: 'pointer', lineHeight: 1,
+          }}>✕</button>
+        </div>
+      )}
+
       {/* Auto-update banner */}
       {!updateDismissed && ['available', 'downloading', 'downloaded'].includes(update.status) && (
         <div style={{
@@ -418,6 +461,7 @@ export default function App() {
         fontSize: 11, color: c.sub, gap: 16, flexShrink: 0,
       }}>
         <span>{status.listingCount} listing{status.listingCount !== 1 ? 's' : ''} in DB</span>
+        {appVersion && <span style={{ color: '#555' }}>v{appVersion}</span>}
         {status.scanCycles > 0 && (
           <span>{status.scanCycles} scan{status.scanCycles !== 1 ? 's' : ''} done</span>
         )}

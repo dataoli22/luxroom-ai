@@ -46,71 +46,79 @@ const s = {
 
 const STEPS = [
   {
-    title: 'Complete setup',
-    desc: 'Enter your name, email, and app password. The app detects your email provider and fills in the rest automatically.',
+    title: 'Quick setup',
+    desc: 'Enter your name and email (the app auto-detects your provider and fills in the rest), pick your University of Luxembourg campus — Kirchberg or Belval — so the right areas are searched, and optionally connect Appartager.',
   },
   {
-    title: 'Wait for Ollama to install',
-    desc: 'After setup, the app downloads and installs the AI engine (Ollama) and a language model. This is a one-time download of 1–4 GB and takes 2–10 minutes depending on your internet speed. Subsequent launches are instant.',
+    title: 'Set up your AI (one time)',
+    desc: 'A required setup screen appears. Pick a free cloud key (Groq or Ollama Cloud — recommended, fastest, nothing to download) or choose "On my device" to have the app install Ollama + a local model for you. No terminal, ever. You can switch anytime later.',
   },
   {
-    title: 'The scan starts automatically',
-    desc: 'Once ready, LuxRoom AI scans housing sites every 3 hours. You don\'t need to do anything — it runs quietly in the background.',
+    title: 'Run your first scan',
+    desc: 'After setup you\'re invited to run the first scan. It takes 10–20 minutes the first time (it checks many sites and reads each listing). A live progress bar shows how it\'s going.',
   },
   {
-    title: 'Check your Listings tab',
-    desc: 'New listings appear in the Listings tab, scored 0–10. The higher the score, the better the match for your budget, location, and move-in date.',
+    title: 'It runs by itself after that',
+    desc: 'LuxRoom scans automatically every few hours in the background — even when the window is closed, as long as your laptop is on. Use the "Every 6h ▾" menu next to Run Now to change the frequency.',
   },
   {
-    title: 'Approve or discard messages',
-    desc: 'When a high-scoring listing is found, a draft outreach message is prepared in the landlord\'s language. Go to Approvals, read the draft, and click Approve to send it — or Discard if it\'s not right.',
+    title: 'Browse your Listings',
+    desc: 'Every scraped room appears in the Listings tab, scored 0–10 (best first). Click a card to open it in your browser, filter by verdict or area, and use "⬇ Export to Excel" to download them all as a spreadsheet.',
   },
   {
-    title: 'Check your email',
-    desc: 'You also receive an email alert with one-click Approve / Discard buttons. You can respond directly from your inbox without opening the app.',
+    title: 'Approve or discard drafts',
+    desc: 'For strong matches, a draft outreach message is prepared in the landlord\'s language. Go to Approvals, read it, and click Approve to send — or Discard. You also get an email alert with one-click Approve / Discard buttons.',
   },
 ]
 
 const FAQS = [
   {
     q: 'How often does the app scan for new listings?',
-    a: 'Every 3 hours by default. You can trigger an immediate scan at any time using the "Run Now" button in the top bar.',
+    a: 'Every 6 hours by default. Change it with the "Every 6h ▾" menu next to Run Now, or trigger an immediate scan any time with Run Now (or Ctrl/Cmd+R).',
+  },
+  {
+    q: 'A repeat scan didn\'t add any new listings — is that a bug?',
+    a: 'Each scan prioritises rooms it hasn\'t captured yet, so repeat scans surface genuinely new listings and skip re-checking the same ones. If a scan adds nothing, there simply were no new rooms matching your filters at that moment — it keeps checking automatically.',
   },
   {
     q: 'Will it send messages automatically without my approval?',
-    a: 'No — in the default Manual mode, nothing is ever sent without you clicking Approve. Away Mode (available in the Approvals tab) auto-sends only for listings scoring 9 or 10 out of 10, and only when you explicitly enable it.',
+    a: 'No — in the default Manual mode nothing is sent without you clicking Approve. Away Mode (in the Approvals tab) auto-sends only for listings scoring 9 or 10, and only when you explicitly turn it on.',
   },
   {
-    q: 'Ollama won\'t install / "model not found" error.',
-    a: 'Open the 🤖 Models button in the top bar. Check that Ollama is running — if not, open a Terminal and run: ollama serve. Then use the Models screen to pull a model.',
+    q: 'The AI setup won\'t finish / a model won\'t download.',
+    a: 'Open the AI panel (the "AI" pill in the top bar, or "Configure AI" on the Listings tab) and paste a free Groq or Ollama Cloud key — it needs no download and works instantly. The local option installs Ollama for you automatically; no terminal is ever required.',
   },
   {
     q: 'The draft message was written in the wrong language.',
-    a: 'Go to the Approvals tab, open the listing, and click "Generate new draft". The language is re-detected from the listing text each time. You can also edit the draft directly before approving.',
+    a: 'Go to the Approvals tab, open the listing, and click "Generate new draft" — the language is re-detected from the listing each time. You can also edit the draft directly before approving.',
   },
   {
     q: 'I\'m not receiving email notifications.',
-    a: 'Go to Settings and check that your SMTP details are correct. Gmail and Yahoo require an App Password — not your regular account password. Check that "Email notifications" is enabled in your notification settings.',
+    a: 'Open Settings and check your email details. Gmail and Yahoo require an App Password — not your regular password. There\'s a "Send test email" button in setup and Settings to confirm it works.',
   },
   {
-    q: 'The app shows no listings after running.',
-    a: 'Check the Log tab for errors. Common causes: Ollama is not running (run ollama serve in a terminal), or the crawled sites returned no results matching your filters. Try widening your budget or area in Settings.',
+    q: 'The app shows no listings after a scan.',
+    a: 'The first scan takes 10–20 minutes — watch the progress bar. If it finishes empty, there may be no new matches right now; it keeps checking automatically. Widening your budget or areas in Settings → Edit search profile helps. Make sure your AI is set up (the "AI" pill shows which one is active).',
   },
   {
     q: 'Can I use this outside Luxembourg?',
-    a: 'The area picker and commute guide are Luxembourg-specific, but the core pipeline works for any city. Change your city in Settings → Profile and update your preferred areas.',
+    a: 'The area picker and commute guide are Luxembourg-specific, but the core pipeline works for any city. Change your city and preferred areas in Settings → Edit search profile.',
   },
   {
     q: 'My laptop has less than 8 GB RAM — can I still use it?',
-    a: 'Yes — use a free cloud API instead of local Ollama. Groq offers a free tier with 14,400 requests/day and no credit card required. Set it up in Settings → AI Model → Cloud API.',
+    a: 'Yes — use a free cloud key instead of a local model. Groq and Ollama Cloud both have generous free tiers with no credit card. Add one in the AI panel; local models are only a fallback.',
   },
   {
     q: 'Is my data safe? Does anything leave my device?',
-    a: 'Only two things leave your device: email alerts go to your own SMTP server (Gmail, Outlook, etc.), and if you configure a cloud API key, listing HTML is sent to that provider only. Your name, passwords, draft messages, and preferences never leave your device.',
+    a: 'Only two things: email alerts go through your own email account (Gmail, etc.), and — if you chose a cloud AI — the listing text is sent to that provider to be analysed. Your name, passwords, preferences, and drafts never leave your device. No tracking, no analytics.',
   },
   {
-    q: 'How do I add or switch AI models?',
-    a: 'Click the 🤖 Models button in the top bar. You can pull new models, set the active model, and remove ones you no longer need.',
+    q: 'How do updates work? Will I lose my listings?',
+    a: 'The app checks for new versions on its own and installs them for you — no need to visit GitHub. All your data (listings, drafts, settings) lives in your private app folder and stays intact across updates.',
+  },
+  {
+    q: 'Downloading a model vs. choosing which AI runs — what\'s the difference?',
+    a: 'The 🤖 Models button just downloads local models to your device. The AI panel (the "AI" pill / "Configure AI") chooses which AI actually analyses your listings — cloud or local. Downloading a model doesn\'t switch to it; selecting it in the AI panel does.',
   },
 ]
 

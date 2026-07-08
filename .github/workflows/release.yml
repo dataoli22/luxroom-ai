@@ -28,10 +28,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Windows installer
+      - name: Upload Windows installer + update metadata
         uses: softprops/action-gh-release@v2
         with:
-          files: release/*.exe
+          # latest.yml and the .blockmap are REQUIRED for the in-app auto-updater
+          # (electron-updater) to detect and download new versions.
+          files: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/latest.yml
           tag_name: ${{ github.ref_name }}
 
   # macOS is NOT built in CI. Mac users build the app on their own device from

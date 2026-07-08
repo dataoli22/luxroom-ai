@@ -246,6 +246,21 @@ export async function countListings() {
   return row?.n ?? 0;
 }
 
+// URLs already captured in listings_raw — used by the crawler to prioritise
+// listings it hasn't seen yet, so each scan surfaces NEW rooms instead of
+// re-checking the same top ones every time.
+export async function getKnownRawUrls() {
+  await getDb();
+  return new Set(all('SELECT url FROM listings_raw').map(r => r.url));
+}
+
+// Stored raw crawl data — lets us re-run extraction/analysis from captured HTML
+// without re-crawling (used to recover listings a past bug failed to analyse).
+export async function getAllRaw() {
+  await getDb();
+  return all('SELECT url, html, timestamp, source, htmlHash FROM listings_raw');
+}
+
 export async function updateListing(url, fields) {
   await getDb();
   const jsonFields = new Set(['pros', 'cons', 'dealbreakers', 'messageDrafts', 'sentEvents']);

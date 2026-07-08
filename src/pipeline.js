@@ -7,7 +7,7 @@ import { analyseListing } from './modules/analysis/analyser.js';
 import { scoreOpportunity } from './modules/opportunity/scorer.js';
 import { notifyAll } from './modules/notifications/notifier.js';
 import { generateDraft } from './modules/messaging/messenger.js';
-import { initDb, upsertListing, saveDraft, beginBatch, endBatch, markStaleListings, countListings } from './db/database.js';
+import { initDb, upsertListing, saveDraft, beginBatch, endBatch, markStaleListings, countListings, getAllRaw, getListing } from './db/database.js';
 
 export const logEmitter      = new EventEmitter();
 export const approvalsEmitter = new EventEmitter();
@@ -229,10 +229,17 @@ export async function processNewListings() {
       _scanTotal += records.length;
       emitScanProgress();
       await mapLimit(records, 3, async (rec) => {
-        const r = await processOne(rec);
-        _scanCurrent++;
-        emitScanProgress();
-        return r;
+        // Bound each listing so a single hung AI call can't stall the whole scan
+        // (which would leave the progress bar frozen at e.g. 52/54 forever). Always
+        // advance the counter, even on failure, so the scan reaches 100% and ends.
+        try {
+          await withTimeout(processOne(rec), 120000, 'listing processing timed out');
+        } catch (err) {
+          logError(`[pipeline] processOne failed for ${rec?.url ?? 'record'}:`, err);
+        } finally {
+          _scanCurrent++;
+          emitScanProgress();
+        }
       });
     };
 
@@ -284,6 +291,14 @@ export async function processNewListings() {
   }
 }
 
+// Reject if `promise` doesn't settle within `ms` — keeps one stuck listing from
+// freezing the whole scan.
+function withTimeout(promise, ms, msg) {
+  let t;
+  const timeout = new Promise((_, reject) => { t = setTimeout(() => reject(new Error(msg)), ms); });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(t));
+}
+
 // Run `fn` over `items` with at most `limit` invocations in flight at once.
 // Resolves once every item has been processed. No external dependency.
 async function mapLimit(items, limit, fn) {
@@ -301,6 +316,65 @@ async function mapLimit(items, limit, fn) {
   for (let w = 0; w < poolSize; w++) workers.push(worker());
   await Promise.all(workers);
   return results;
+}
+
+// One-time recovery: re-run extraction + analysis on listings whose HTML we
+// already captured but that were never properly analysed (an earlier extractor
+// bug dropped them or left them as REVIEW). Uses stored HTML — NO re-crawl — so
+// historical data is fixed without running everything again. Idempotent: only
+// touches listings that are missing or REVIEW/unscored.
+export async function reprocessStoredRaw() {
+  await initDb();
+  const config = getSettings();
+  const raws = await getAllRaw();
+  let recovered = 0, considered = 0;
+  log(`[pipeline] Reprocess: scanning ${raws.length} stored page(s) for un-analysed listings…`);
+
+  beginBatch();
+  try {
+    for (const raw of raws) {
+      let existing = null;
+      try { existing = await getListing(raw.url); } catch {}
+      const needs = !existing || existing.verdict == null || existing.verdict === 'REVIEW' || existing.score == null;
+      if (!needs) continue;
+      considered++;
+
+      const rawRecord = { url: raw.url, html: raw.html, timestamp: raw.timestamp, source: raw.source, htmlHash: raw.htmlHash };
+
+      // Extract (falls back to a minimal record so the listing still shows).
+      let extracted = null;
+      try { extracted = await extractListing(rawRecord); } catch (err) { logError(`[pipeline] reprocess extract failed for ${raw.url}:`, err); }
+      if (extracted == null) {
+        extracted = {
+          location: 'unknown', insideLuxembourg: true, rentTotal: 'unknown', availability: 'unknown',
+          domiciliationFlag: 'unknown', estimatedCommute: 'unknown', furnished: 'unknown',
+          smokingAllowed: 'unknown', genderPolicy: 'unknown', listingTitle: raw.url,
+          contactName: 'unknown', contactMethod: 'unknown', rawDescription: '', corridor: 'unknown',
+        };
+      }
+
+      // Analyse (fall back to REVIEW so it stays visible if analysis is unavailable).
+      let analysed = null;
+      try { analysed = await analyseListing(extracted); } catch (err) { logError(`[pipeline] reprocess analyse failed for ${raw.url}:`, err); }
+      if (analysed == null) {
+        analysed = { ...extracted, verdict: 'REVIEW', score: null, corridor: extracted.corridor ?? 'unknown', pros: [], cons: [], dealbreakers: [], topReason: 'Not auto-analysed — open the listing to review it yourself.' };
+      }
+
+      const analysedWithHousingScore = { ...analysed, housingScore: analysed.score ?? 0, maxBudget: Number(config.profile?.maxBudget) || null };
+      let scores = {};
+      try { scores = await scoreOpportunity(analysedWithHousingScore); } catch (err) { logError(`[pipeline] reprocess score failed for ${raw.url}:`, err); }
+
+      const record = { ...rawRecord, ...extracted, ...analysed, housingScore: analysed.score ?? 0, ...scores, id: existing?.id ?? Date.now() };
+      try { await upsertListing(record); if (record.verdict && record.verdict !== 'REVIEW') recovered++; } catch (err) { logError(`[pipeline] reprocess upsert failed for ${raw.url}:`, err); }
+    }
+    try { _listingCount = await countListings(); } catch {}
+  } finally {
+    endBatch();
+  }
+
+  log(`[pipeline] Reprocess complete — reviewed ${considered}, recovered ${recovered} listing(s) from stored HTML (no re-crawl).`);
+  approvalsEmitter.emit('updated');
+  return { considered, recovered };
 }
 
 export async function startPipeline() {

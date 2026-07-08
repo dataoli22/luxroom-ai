@@ -22,6 +22,13 @@ export default function ScanProgress({ initial }) {
     return () => unsub?.()
   }, [])
 
+  // Hide the bar the instant a scan completes — it reappears when the next scan
+  // emits its first progress event.
+  useEffect(() => {
+    const unsub = window.luxroom?.scan?.onComplete?.(() => setP(null))
+    return () => unsub?.()
+  }, [])
+
   // Keep the seed fresh if the parent polls a newer status while we have none.
   useEffect(() => {
     if (initial && initial.phase && initial.phase !== 'idle' && (!p || p.phase === 'idle')) setP(initial)

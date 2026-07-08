@@ -31,10 +31,19 @@ export default function App() {
   const [lastScanEmpty, setLastScanEmpty] = useState(false)
   const [aiProvider, setAiProvider] = useState(null)
   const [now, setNow] = useState(Date.now())
+  const [update, setUpdate] = useState({ status: 'idle' })
+  const [updateDismissed, setUpdateDismissed] = useState(false)
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
+  }, [])
+
+  // Auto-update: subscribe to status and seed the current state.
+  useEffect(() => {
+    window.luxroom?.update?.getState().then(s => s && setUpdate(s)).catch(() => {})
+    const unsub = window.luxroom?.update?.onStatus?.((s) => { setUpdate(s); if (s?.status === 'available' || s?.status === 'downloaded') setUpdateDismissed(false) })
+    return () => unsub?.()
   }, [])
 
   // Onboarding state: null = loading, false = not done, true = done
@@ -302,6 +311,35 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Auto-update banner */}
+      {!updateDismissed && ['available', 'downloading', 'downloaded'].includes(update.status) && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
+          padding: '8px 16px', fontSize: 13,
+          background: update.status === 'downloaded' ? '#0d1a0d' : '#12102a',
+          borderBottom: `1px solid ${update.status === 'downloaded' ? '#1a4a1a' : '#2a2060'}`,
+          color: update.status === 'downloaded' ? '#6ee7b7' : '#c4b5fd',
+        }}>
+          <span style={{ fontSize: 15 }}>{update.status === 'downloaded' ? '✅' : '⬇️'}</span>
+          <span style={{ flex: 1 }}>
+            {update.status === 'available' && <>A new version{update.version ? ` (v${update.version})` : ''} is downloading in the background…</>}
+            {update.status === 'downloading' && <>Downloading update{update.percent != null ? ` — ${update.percent}%` : '…'}</>}
+            {update.status === 'downloaded' && <>Update{update.version ? ` v${update.version}` : ''} ready. Restart to install — your data stays intact.</>}
+          </span>
+          {update.status === 'downloaded' && (
+            <button onClick={() => window.luxroom?.update?.install()} style={{
+              padding: '5px 14px', borderRadius: 6, border: 'none',
+              background: 'linear-gradient(135deg, #16a34a, #15803d)', color: '#fff',
+              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            }}>Restart &amp; update</button>
+          )}
+          <button onClick={() => setUpdateDismissed(true)} title="Dismiss" style={{
+            background: 'none', border: 'none', color: 'inherit', opacity: 0.6,
+            fontSize: 16, cursor: 'pointer', lineHeight: 1,
+          }}>✕</button>
+        </div>
+      )}
 
       {/* Live scan progress bar (hidden when idle) */}
       <ScanProgress initial={{ phase: status.scanPhase, current: status.scanCurrent, total: status.scanTotal, startedAt: status.scanStartedAt }} />

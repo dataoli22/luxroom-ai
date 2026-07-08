@@ -32,6 +32,17 @@ contextBridge.exposeInMainWorld('luxroom', {
     },
   },
 
+  update: {
+    getState: () => ipcRenderer.invoke('update:get-state'),
+    check: () => ipcRenderer.invoke('update:check'),
+    install: () => ipcRenderer.invoke('update:install'),
+    onStatus: (callback) => {
+      const handler = (_, data) => callback(data);
+      ipcRenderer.on('update:status', handler);
+      return () => ipcRenderer.removeListener('update:status', handler);
+    },
+  },
+
   auth: {
     sources: () => ipcRenderer.invoke('auth:sources'),
     openLogin: (source) => ipcRenderer.invoke('auth:open-login', { source }),

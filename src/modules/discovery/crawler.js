@@ -1010,11 +1010,14 @@ export async function crawlSource(sourceConfig, browser) {
         console.error(`[${sourceConfig.name}] Tier 1 error: ${err.message}`);
       }
 
-      // ── Tier 1 pagination: only if we don't already have enough to visit ────
-      // We only visit MAX_LISTINGS_PER_SOURCE detail pages, so there's no point
-      // gathering hundreds of links — paginate just enough.
-      if (links.length > 0 && links.length < MAX_LISTINGS_PER_SOURCE) {
-        const pagedLinks = await paginateAndExtract(page, sourceConfig, 2);
+      // ── Tier 1 pagination ──────────────────────────────────────────────────
+      // Gather a pool a few pages deep. We only VISIT MAX_LISTINGS_PER_SOURCE
+      // detail pages, but re-scans need a bigger pool of candidate URLs so we can
+      // reach listings we haven't captured yet — otherwise every scan just re-checks
+      // the same top listings and never finds new ones. Link extraction is cheap;
+      // only the detail-page visits (still capped) are expensive.
+      if (links.length > 0 && links.length < MAX_LISTINGS_PER_SOURCE * 3) {
+        const pagedLinks = await paginateAndExtract(page, sourceConfig, 3);
         links = [...new Set([...links, ...pagedLinks])];
       }
 
@@ -1049,10 +1052,17 @@ export async function crawlSource(sourceConfig, browser) {
       await randomDelay();
     }
 
-    // Visit only the first N detail pages so a scan stays fast and results start
-    // appearing quickly. The newest listings are surfaced first by the sources.
-    const toVisit = [...allListingUrls].slice(0, MAX_LISTINGS_PER_SOURCE);
-    console.log(`[${sourceConfig.name}] Visiting ${toVisit.length} of ${allListingUrls.size} listing(s)`);
+    // Prioritise listings we haven't captured yet so every scan surfaces NEW
+    // rooms instead of re-checking the same top ones. Unseen URLs go first; any
+    // spare slots are filled with already-seen ones (to catch price/availability
+    // changes). This is what makes repeat scans actually append new listings.
+    let known = new Set();
+    try { known = await db.getKnownRawUrls(); } catch (e) { console.error(`[${sourceConfig.name}] known-URL lookup failed: ${e.message}`); }
+    const all    = [...allListingUrls];
+    const unseen = all.filter(u => !known.has(u));
+    const seen   = all.filter(u => known.has(u));
+    const toVisit = [...unseen, ...seen].slice(0, MAX_LISTINGS_PER_SOURCE);
+    console.log(`[${sourceConfig.name}] Visiting ${toVisit.length} of ${allListingUrls.size} listing(s) — ${unseen.length} new, ${seen.length} seen`);
     for (const listingUrl of toVisit) {
       console.log(`[${sourceConfig.name}] Visiting listing: ${listingUrl}`);
       const ok = await safeGoto(page, listingUrl);

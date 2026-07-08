@@ -384,6 +384,73 @@ if (!gotTheLock) {
   app.on('second-instance', () => { showWindow() })
 }
 
+// ─── One-time historical data recovery ────────────────────────────────────────
+let _reprocessRunning = false
+async function maybeReprocessStoredRaw() {
+  try {
+    if (_reprocessRunning) return
+    const s = _settings.getSettings()
+    if (s.reprocessedStoredRawV1) return
+    // Only run when the AI can actually analyse — a cloud key, or a running Ollama.
+    const hasCloudKey = !!(s.OLLAMA_API_KEY || s.groqApiKey || s.geminiApiKey || s.openaiApiKey || s.anthropicApiKey || s.ANTHROPIC_API_KEY)
+    const aiReady = hasCloudKey || await isOllamaUp().catch(() => false)
+    if (!aiReady) return // try again next launch or after a scan
+    _reprocessRunning = true
+    console.log('[main] Running one-time recovery of historical listings from stored HTML…')
+    await _pipeline.reprocessStoredRaw()
+    _settings.saveSettings({ reprocessedStoredRawV1: true })
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('approvals:updated')
+  } catch (err) {
+    console.error('[main] historical recovery failed:', err.message)
+  } finally {
+    _reprocessRunning = false
+  }
+}
+
+// ─── Auto-updater ─────────────────────────────────────────────────────────────
+let _updater = null
+let _updateState = { status: 'idle' } // idle | checking | available | downloading | downloaded | none | error
+
+function sendUpdate(channel, payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload)
+}
+
+function setupAutoUpdater() {
+  // Only meaningful in a packaged app installed via the NSIS installer.
+  if (!app.isPackaged) return
+  try {
+    const { autoUpdater } = require('electron-updater')
+    _updater = autoUpdater
+    autoUpdater.autoDownload = true
+    autoUpdater.autoInstallOnAppQuit = true
+
+    autoUpdater.on('checking-for-update', () => { _updateState = { status: 'checking' }; sendUpdate('update:status', _updateState) })
+    autoUpdater.on('update-available', (info) => {
+      _updateState = { status: 'available', version: info?.version }
+      sendUpdate('update:status', _updateState)
+    })
+    autoUpdater.on('update-not-available', () => { _updateState = { status: 'none' }; sendUpdate('update:status', _updateState) })
+    autoUpdater.on('download-progress', (p) => {
+      _updateState = { status: 'downloading', percent: Math.round(p?.percent ?? 0) }
+      sendUpdate('update:status', _updateState)
+    })
+    autoUpdater.on('update-downloaded', (info) => {
+      _updateState = { status: 'downloaded', version: info?.version }
+      sendUpdate('update:status', _updateState)
+    })
+    autoUpdater.on('error', (err) => {
+      _updateState = { status: 'error', message: String(err?.message || err) }
+      sendUpdate('update:status', _updateState)
+    })
+
+    // Check now, then every 6 hours while the app runs.
+    autoUpdater.checkForUpdates().catch(() => {})
+    setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000)
+  } catch (e) {
+    console.error('[main] auto-updater unavailable:', e.message)
+  }
+}
+
 app.whenReady().then(async () => {
   if (!gotTheLock) return
   buildAppMenu()
@@ -401,6 +468,11 @@ app.whenReady().then(async () => {
 
   _settings.applyToEnv(_settings.getSettings())
   await _db.initDb()
+
+  // One-time recovery of historical listings whose HTML was captured but never
+  // analysed (an earlier extractor bug). Runs from stored HTML — no re-crawl —
+  // and only once the AI is configured, so recovered listings get real scores.
+  maybeReprocessStoredRaw()
 
   // Start email-approval HTTP server (sets LUXROOM_APPROVAL_PORT for notifier)
   await startApprovalServer()
@@ -422,6 +494,9 @@ app.whenReady().then(async () => {
   // Broadcast scan:complete to renderer, update tray badge, fire OS notification
   _pipeline.scanEmitter.on('complete', ({ savedCount, scanCycles }) => {
     if (savedCount > 0) setUnreadBadge(_unreadCount + savedCount)
+    // If historical recovery hasn't run yet (AI wasn't ready at launch), the AI is
+    // clearly working now — run it once in the background.
+    maybeReprocessStoredRaw()
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('scan:complete', { savedCount, scanCycles })
     }
@@ -482,11 +557,9 @@ app.whenReady().then(async () => {
     }
   })
 
-  // Auto-updater (GitHub releases)
-  try {
-    const { autoUpdater } = require('electron-updater')
-    autoUpdater.checkForUpdatesAndNotify().catch(() => {})
-  } catch {}
+  // Auto-updater (GitHub releases) — download new versions in-app so users never
+  // have to visit GitHub. Their data lives in userData and is untouched by updates.
+  setupAutoUpdater()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -521,6 +594,20 @@ ipcMain.handle('settings:save', async (_e, partial) => {
     await _pipeline.startPipeline()
   }
   return next
+})
+
+// ─── Update IPC ───────────────────────────────────────────────────────────────
+ipcMain.handle('update:get-state', async () => ({ ..._updateState, current: app.getVersion() }))
+ipcMain.handle('update:check', async () => {
+  if (!_updater) return { status: 'unsupported' }
+  try { await _updater.checkForUpdates() } catch (e) { return { status: 'error', message: String(e?.message || e) } }
+  return _updateState
+})
+ipcMain.handle('update:install', async () => {
+  if (!_updater) return false
+  // Quit and install the downloaded update. Data in userData is preserved.
+  setImmediate(() => _updater.quitAndInstall(false, true))
+  return true
 })
 
 // Which provider will actually be used right now (resolves 'auto').

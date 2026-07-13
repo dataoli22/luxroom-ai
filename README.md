@@ -1,3 +1,11 @@
+<div align="center">
+
+[![Downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdataoli22%2Fluxroom-ai%2Fmaster%2F.github%2Fbadges%2Fdownloads.json&style=for-the-badge)](../../releases)
+&nbsp;
+[![License: MIT](https://img.shields.io/badge/License-MIT-4ade80?style=for-the-badge)](LICENSE)
+
+</div>
+
 # LuxRoom AI
 
 > Your automated housing assistant for Luxembourg. It watches the housing sites for you, scores each room against what you want, and even drafts a message to the landlord in their own language. Runs on your laptop, free.

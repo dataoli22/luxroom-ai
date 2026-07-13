@@ -1,0 +1,60 @@
+name: Update download counter
+
+# Keeps .github/badges/downloads.json in sync with the real number of app
+# downloads (Windows .exe + Mac .zip/.dmg + Linux .AppImage/.tar.gz), excluding
+# the auto-updater's latest.yml / .blockmap metadata. The README badge reads that
+# JSON via shields.io's endpoint, so it stays accurate with zero manual work.
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'      # every 6 hours
+  release:
+    types: [published]         # refresh right after a new release
+  workflow_dispatch: {}         # allow manual runs
+
+permissions:
+  contents: write
+
+concurrency:
+  group: download-counter
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute download total (installers only)
+        id: count
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COUNT=$(gh api "repos/${{ github.repository }}/releases" --paginate \
+            --jq '[.[].assets[] | select(.name | test("[.](exe|zip|AppImage|dmg|tar[.]gz)$"; "i")) | .download_count] | add // 0')
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "Installer downloads so far: $COUNT"
+
+      - name: Write badge JSON
+        run: |
+          mkdir -p .github/badges
+          cat > .github/badges/downloads.json <<EOF
+          {
+            "schemaVersion": 1,
+            "label": "Downloads",
+            "message": "${{ steps.count.outputs.count }}",
+            "color": "7c3aed"
+          }
+          EOF
+
+      - name: Commit if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- .github/badges/downloads.json; then
+            git add .github/badges/downloads.json
+            git commit -m "chore: update download counter (${{ steps.count.outputs.count }})"
+            git push
+          else
+            echo "No change in download count."
+          fi
